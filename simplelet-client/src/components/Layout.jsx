@@ -32,9 +32,15 @@ export default function Layout({ children }) {
                 <>
                   <Link
                     to="/dashboard"
-                    className="text-gray-600 hover:text-primary-600"
+                    className="text-gray-600 hover:text-primary-600 transition"
                   >
                     Dashboard
+                  </Link>
+                  <Link
+                    to="/create-listing"
+                    className="text-gray-600 hover:text-primary-600 transition"
+                  >
+                    Post Ad
                   </Link>
                   <button onClick={handleLogout} className="btn-outline">
                     Logout
@@ -61,7 +67,7 @@ export default function Layout({ children }) {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t">
+      <footer className="bg-white border-t mt-auto">
         <div className="max-w-7xl mx-auto px-4 py-6 text-center text-gray-500 text-sm">
           <p>© 2026 SimpleLet. Simple property listings. No clutter.</p>
         </div>
