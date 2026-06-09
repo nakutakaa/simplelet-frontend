@@ -8,6 +8,7 @@ import RegisterPage from "./pages/RegisterPage";
 import VerifyPage from "./pages/VerifyPage";
 import DashboardPage from "./pages/DashboardPage";
 import CreateListingPage from "./pages/CreateListingPage";
+import EditListingPage from "./pages/EditListingPage";
 
 function App() {
   return (
@@ -31,6 +32,14 @@ function App() {
             element={
               <ProtectedRoute requireVerified={true}>
                 <CreateListingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/edit-listing/:id"
+            element={
+              <ProtectedRoute requireVerified={true}>
+                <EditListingPage />
               </ProtectedRoute>
             }
           />
