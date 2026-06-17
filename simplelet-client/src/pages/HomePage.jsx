@@ -1,8 +1,22 @@
 // src/pages/HomePage.jsx
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom"; // ✅ You already have this import
+import { Link } from "react-router-dom";
 import API from "../services/api";
 import toast from "react-hot-toast";
+
+// Helper function to optimize Cloudinary images
+const getOptimizedImageUrl = (url, width = 400, height = 300) => {
+  if (!url) return null;
+  // Only process Cloudinary URLs
+  if (url.includes("cloudinary.com")) {
+    // Add transformations: resize, auto quality, auto format
+    return url.replace(
+      "/upload/",
+      `/upload/w_${width},h_${height},c_fill,q_auto,f_auto/`,
+    );
+  }
+  return url;
+};
 
 const fetchListings = async () => {
   const { data } = await API.get("/listings");
@@ -49,15 +63,18 @@ export default function HomePage() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {listings.map((listing) => (
-        // ✅ Wrap the entire card with Link
         <Link key={listing.id} to={`/listing/${listing.id}`}>
           <div className="card group cursor-pointer transition-transform hover:scale-[1.02]">
             {listing.cover_image ? (
-              <img
-                src={listing.cover_image}
-                alt={listing.title}
-                className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-              />
+              <div className="w-full h-48 bg-gray-100 overflow-hidden">
+                <img
+                  src={getOptimizedImageUrl(listing.cover_image, 400, 300)}
+                  alt={listing.title}
+                  className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
             ) : (
               <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
                 <svg

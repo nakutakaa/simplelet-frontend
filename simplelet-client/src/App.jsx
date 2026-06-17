@@ -9,6 +9,7 @@ import VerifyPage from "./pages/VerifyPage";
 import DashboardPage from "./pages/DashboardPage";
 import CreateListingPage from "./pages/CreateListingPage";
 import EditListingPage from "./pages/EditListingPage";
+import ListingDetailPage from "./pages/ListingDetailPage";
 
 function App() {
   return (
@@ -43,6 +44,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/listing/:id" element={<ListingDetailPage />} />
         </Routes>
       </Layout>
     </BrowserRouter>
