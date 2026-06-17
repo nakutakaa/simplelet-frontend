@@ -1,10 +1,11 @@
 // src/pages/ListingDetailPage.jsx
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
 import ImageSwiper from "../components/ImageSwiper";
+import CommentItem from "../components/CommentItem";
 
 // Helper function to get optimized Cloudinary URL
 const getOptimizedImageUrl = (url, width = 800, height = 600) => {
@@ -32,12 +33,28 @@ const fetchListing = async (id) => {
   return data;
 };
 
+// Fetch comments
+const fetchComments = async (listingId) => {
+  const { data } = await API.get(`/comments/listings/${listingId}/comments`);
+  return data;
+};
+
+// Post comment
+const postComment = async ({ listingId, content }) => {
+  const { data } = await API.post(`/comments/listings/${listingId}/comments`, {
+    content,
+  });
+  return data;
+};
+
 export default function ListingDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showContact, setShowContact] = useState(false);
   const [swiperOpen, setSwiperOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [commentContent, setCommentContent] = useState("");
 
   // Fetch listing data
   const {
@@ -47,6 +64,31 @@ export default function ListingDetailPage() {
   } = useQuery({
     queryKey: ["listing", id],
     queryFn: () => fetchListing(id),
+  });
+
+  // Fetch comments
+  const {
+    data: commentsData,
+    isLoading: commentsLoading,
+    refetch: refetchComments,
+  } = useQuery({
+    queryKey: ["comments", id],
+    queryFn: () => fetchComments(id),
+    enabled: !!id,
+  });
+
+  // Post comment mutation
+  const commentMutation = useMutation({
+    mutationFn: postComment,
+    onSuccess: () => {
+      toast.success("Comment posted!");
+      setCommentContent("");
+      queryClient.invalidateQueries(["comments", id]);
+      refetchComments();
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || "Failed to post comment");
+    },
   });
 
   const handleContactClick = () => {
@@ -63,6 +105,15 @@ export default function ListingDetailPage() {
   const openImageSwiper = (index) => {
     setSelectedImageIndex(index);
     setSwiperOpen(true);
+  };
+
+  const handleCommentSubmit = (e) => {
+    e.preventDefault();
+    if (!commentContent.trim()) {
+      toast.error("Please enter a comment");
+      return;
+    }
+    commentMutation.mutate({ listingId: id, content: commentContent });
   };
 
   if (isLoading) {
@@ -171,14 +222,196 @@ export default function ListingDetailPage() {
         <ImageSwiper
           images={listing.images.map((img) => ({
             ...img,
-            url: getOptimizedImageUrl(img.url, 1200, 900), // Full-screen optimized
+            url: getOptimizedImageUrl(img.url, 1200, 900),
           }))}
           onClose={() => setSwiperOpen(false)}
         />
       )}
 
-      {/* Rest of the listing details remains the same */}
-      {/* ... existing listing details code ... */}
+      {/* Listing Details */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        {/* Title & Status */}
+        <div className="flex justify-between items-start mb-4">
+          <h1 className="text-2xl font-bold">{listing.title}</h1>
+          {listing.is_taken && (
+            <span className="bg-red-100 text-red-700 text-sm px-3 py-1 rounded-full">
+              Taken
+            </span>
+          )}
+        </div>
+
+        {/* Location */}
+        <div className="flex items-center gap-2 text-gray-500 mb-4">
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+          </svg>
+          <span>{listing.location}</span>
+        </div>
+
+        {/* Price */}
+        <div className="mb-4">
+          <p className="text-3xl font-bold text-primary-600">
+            KSh {listing.price?.toLocaleString()}
+            {listing.price && (
+              <span className="text-sm font-normal text-gray-500">
+                {" "}
+                / month
+              </span>
+            )}
+          </p>
+        </div>
+
+        {/* Description */}
+        {listing.description && (
+          <div className="mb-6">
+            <h3 className="font-semibold text-lg mb-2">Description</h3>
+            <p className="text-gray-700 whitespace-pre-wrap">
+              {listing.description}
+            </p>
+          </div>
+        )}
+
+        {/* Property Details */}
+        <div className="border-t border-gray-100 pt-4 mb-6">
+          <h3 className="font-semibold text-lg mb-3">Property Details</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-xs text-gray-500">Property Type</p>
+              <p className="font-medium">{listing.house_type_display}</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-xs text-gray-500">Posted By</p>
+              <p className="font-medium">{listing.author?.name}</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-xs text-gray-500">Posted On</p>
+              <p className="font-medium">
+                {new Date(listing.created_at).toLocaleDateString()}
+              </p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-xs text-gray-500">Status</p>
+              <p
+                className={`font-medium ${listing.is_taken ? "text-red-600" : "text-green-600"}`}
+              >
+                {listing.is_taken ? "Taken" : "Available"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Contact Section */}
+        <div className="border-t border-gray-100 pt-6">
+          {!showContact ? (
+            <button onClick={handleContactClick} className="w-full btn-primary">
+              Reveal Contact Number
+            </button>
+          ) : (
+            <div className="bg-gray-50 rounded-lg p-4 text-center">
+              <p className="text-sm text-gray-600 mb-2">Contact Seller</p>
+              <div className="flex items-center justify-center gap-3">
+                <a
+                  href={`tel:${listing.contact_phone}`}
+                  className="text-primary-600 font-semibold text-lg"
+                >
+                  {listing.contact_phone}
+                </a>
+                <button
+                  onClick={handleCopyPhone}
+                  className="text-gray-500 hover:text-primary-600"
+                  title="Copy to clipboard"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                Click to call or copy the number
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Comments Section */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
+        <h3 className="font-semibold text-lg mb-4">
+          Comments
+          {commentsData && (
+            <span className="text-sm text-gray-500 ml-2">
+              ({commentsData.total})
+            </span>
+          )}
+        </h3>
+
+        {/* Comment Input */}
+        <form onSubmit={handleCommentSubmit} className="flex gap-3 mb-6">
+          <input
+            type="text"
+            value={commentContent}
+            onChange={(e) => setCommentContent(e.target.value)}
+            placeholder="Write a comment..."
+            className="flex-1 input"
+            disabled={commentMutation.isPending}
+          />
+          <button
+            type="submit"
+            disabled={commentMutation.isPending || !commentContent.trim()}
+            className="btn-primary px-6"
+          >
+            {commentMutation.isPending ? "Posting..." : "Post"}
+          </button>
+        </form>
+
+        {/* Comments List */}
+        <div className="space-y-4">
+          {commentsLoading ? (
+            <div className="flex justify-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
+            </div>
+          ) : commentsData?.comments?.length > 0 ? (
+            commentsData.comments.map((comment) => (
+              <CommentItem
+                key={comment.id}
+                comment={comment}
+                listingId={id}
+                onReply={refetchComments}
+              />
+            ))
+          ) : (
+            <p className="text-gray-500 text-center py-4">
+              No comments yet. Be the first to comment!
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
