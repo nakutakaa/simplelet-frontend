@@ -1,5 +1,5 @@
 // src/pages/ListingDetailPage.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -39,11 +39,34 @@ const fetchComments = async (listingId) => {
   return data;
 };
 
-// Post comment
-const postComment = async ({ listingId, content }) => {
-  const { data } = await API.post(`/comments/listings/${listingId}/comments`, {
-    content,
-  });
+// Post comment with anonymous support
+const postComment = async ({
+  listingId,
+  content,
+  isAnonymous,
+  guestName,
+  guestPhone,
+}) => {
+  const isAnonymousBool = isAnonymous === true;
+
+  const payload = {
+    content: content,
+    is_anonymous: isAnonymousBool,
+  };
+
+  if (isAnonymousBool) {
+    if (guestName && guestName.trim()) {
+      payload.guest_name = guestName.trim();
+    }
+    if (guestPhone && guestPhone.trim()) {
+      payload.guest_phone = guestPhone.trim();
+    }
+  }
+
+  const { data } = await API.post(
+    `/comments/listings/${listingId}/comments`,
+    payload,
+  );
   return data;
 };
 
@@ -55,6 +78,21 @@ export default function ListingDetailPage() {
   const [swiperOpen, setSwiperOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [commentContent, setCommentContent] = useState("");
+
+  // Check if user is logged in
+  const token = localStorage.getItem("token");
+  const user = JSON.parse(localStorage.getItem("user") || "null");
+  const isLoggedIn = !!token && user;
+
+  // Default to anonymous if not logged in
+  const [isAnonymous, setIsAnonymous] = useState(!isLoggedIn);
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+
+  // Update anonymous state when login status changes
+  useEffect(() => {
+    setIsAnonymous(!isLoggedIn);
+  }, [isLoggedIn]);
 
   // Fetch listing data
   const {
@@ -83,11 +121,16 @@ export default function ListingDetailPage() {
     onSuccess: () => {
       toast.success("Comment posted!");
       setCommentContent("");
+      setGuestName("");
+      setGuestPhone("");
+      // Keep anonymous state based on login status
+      setIsAnonymous(!isLoggedIn);
       queryClient.invalidateQueries(["comments", id]);
       refetchComments();
     },
     onError: (error) => {
-      toast.error(error.response?.data?.error || "Failed to post comment");
+      const errorMsg = error.response?.data?.error || "Failed to post comment";
+      toast.error(errorMsg);
     },
   });
 
@@ -113,7 +156,23 @@ export default function ListingDetailPage() {
       toast.error("Please enter a comment");
       return;
     }
-    commentMutation.mutate({ listingId: id, content: commentContent });
+
+    commentMutation.mutate({
+      listingId: id,
+      content: commentContent,
+      isAnonymous: isAnonymous,
+      guestName: isAnonymous ? guestName : undefined,
+      guestPhone: isAnonymous ? guestPhone : undefined,
+    });
+  };
+
+  const handleAnonymousToggle = (e) => {
+    const checked = e.target.checked;
+    setIsAnonymous(checked);
+    if (!checked) {
+      setGuestName("");
+      setGuestPhone("");
+    }
   };
 
   if (isLoading) {
@@ -371,23 +430,70 @@ export default function ListingDetailPage() {
           )}
         </h3>
 
-        {/* Comment Input */}
-        <form onSubmit={handleCommentSubmit} className="flex gap-3 mb-6">
-          <input
-            type="text"
-            value={commentContent}
-            onChange={(e) => setCommentContent(e.target.value)}
-            placeholder="Write a comment..."
-            className="flex-1 input"
-            disabled={commentMutation.isPending}
-          />
-          <button
-            type="submit"
-            disabled={commentMutation.isPending || !commentContent.trim()}
-            className="btn-primary px-6"
-          >
-            {commentMutation.isPending ? "Posting..." : "Post"}
-          </button>
+        {/* Comment Input with Anonymous Option */}
+        <form
+          onSubmit={handleCommentSubmit}
+          className="flex flex-col gap-3 mb-6"
+        >
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={commentContent}
+              onChange={(e) => setCommentContent(e.target.value)}
+              placeholder="Write a comment..."
+              className="flex-1 input"
+              disabled={commentMutation.isPending}
+            />
+            <button
+              type="submit"
+              disabled={commentMutation.isPending || !commentContent.trim()}
+              className="btn-primary px-6"
+            >
+              {commentMutation.isPending ? "Posting..." : "Post"}
+            </button>
+          </div>
+
+          {/* Anonymous options */}
+          <div className="flex items-center gap-4 flex-wrap">
+            {isLoggedIn ? (
+              // Logged in user - can choose to comment anonymously
+              <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isAnonymous}
+                  onChange={handleAnonymousToggle}
+                  className="rounded cursor-pointer"
+                />
+                Comment as Guest (currently:{" "}
+                <strong>{user?.name || "You"}</strong>)
+              </label>
+            ) : (
+              // Not logged in - always anonymous with optional name/phone
+              <span className="text-xs text-gray-500">
+                <strong>Commenting as Guest</strong> - enter your name and phone
+                below (optional)
+              </span>
+            )}
+
+            {isAnonymous && (
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="text"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder="Your name (optional)"
+                  className="input text-sm py-1 w-40"
+                />
+                <input
+                  type="tel"
+                  value={guestPhone}
+                  onChange={(e) => setGuestPhone(e.target.value)}
+                  placeholder="Phone (optional)"
+                  className="input text-sm py-1 w-40"
+                />
+              </div>
+            )}
+          </div>
         </form>
 
         {/* Comments List */}

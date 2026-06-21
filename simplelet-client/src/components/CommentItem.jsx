@@ -4,10 +4,20 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
 
-const postReply = async ({ listingId, parentId, content }) => {
+const postReply = async ({
+  listingId,
+  parentId,
+  content,
+  isAnonymous,
+  guestName,
+  guestPhone,
+}) => {
   const { data } = await API.post(`/comments/listings/${listingId}/comments`, {
     content,
     parent_id: parentId,
+    is_anonymous: isAnonymous,
+    guest_name: isAnonymous ? guestName : undefined,
+    guest_phone: isAnonymous ? guestPhone : undefined,
   });
   return data;
 };
@@ -21,6 +31,9 @@ export default function CommentItem({
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyContent, setReplyContent] = useState("");
   const [showReplies, setShowReplies] = useState(true);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
   const queryClient = useQueryClient();
 
   const replyMutation = useMutation({
@@ -28,6 +41,8 @@ export default function CommentItem({
     onSuccess: () => {
       toast.success("Reply posted!");
       setReplyContent("");
+      setGuestName("");
+      setGuestPhone("");
       setShowReplyForm(false);
       queryClient.invalidateQueries(["comments", listingId]);
       if (onReply) onReply();
@@ -47,6 +62,9 @@ export default function CommentItem({
       listingId,
       parentId: comment.id,
       content: replyContent,
+      isAnonymous,
+      guestName: isAnonymous ? guestName : undefined,
+      guestPhone: isAnonymous ? guestPhone : undefined,
     });
   };
 
@@ -102,7 +120,7 @@ export default function CommentItem({
 
       {/* Reply Form */}
       {showReplyForm && canReply && (
-        <form onSubmit={handleReplySubmit} className="mb-3 ml-4">
+        <form onSubmit={handleReplySubmit} className="mb-3 ml-4 space-y-2">
           <div className="flex gap-2">
             <input
               type="text"
@@ -119,6 +137,37 @@ export default function CommentItem({
             >
               {replyMutation.isPending ? "..." : "Reply"}
             </button>
+          </div>
+
+          {/* Anonymous options */}
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-1 text-xs text-gray-500">
+              <input
+                type="checkbox"
+                checked={isAnonymous}
+                onChange={(e) => setIsAnonymous(e.target.checked)}
+                className="rounded"
+              />
+              Comment as Guest
+            </label>
+            {isAnonymous && (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder="Your name (optional)"
+                  className="input text-sm py-1"
+                />
+                <input
+                  type="tel"
+                  value={guestPhone}
+                  onChange={(e) => setGuestPhone(e.target.value)}
+                  placeholder="Phone (optional)"
+                  className="input text-sm py-1"
+                />
+              </div>
+            )}
           </div>
         </form>
       )}
