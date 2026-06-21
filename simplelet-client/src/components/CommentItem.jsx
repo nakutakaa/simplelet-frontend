@@ -1,6 +1,6 @@
 // src/components/CommentItem.jsx
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
 
@@ -22,6 +22,13 @@ const postReply = async ({
   return data;
 };
 
+const fetchMoreReplies = async (commentId, page) => {
+  const { data } = await API.get(
+    `/comments/${commentId}/replies?page=${page}&per_page=10`,
+  );
+  return data;
+};
+
 export default function CommentItem({
   comment,
   listingId,
@@ -34,7 +41,16 @@ export default function CommentItem({
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
+  const [repliesPage, setRepliesPage] = useState(1);
+  const [allReplies, setAllReplies] = useState(comment.replies || []);
   const queryClient = useQueryClient();
+
+  // Query for fetching more replies
+  const { data: moreRepliesData, refetch: refetchMoreReplies } = useQuery({
+    queryKey: ["replies", comment.id, repliesPage],
+    queryFn: () => fetchMoreReplies(comment.id, repliesPage),
+    enabled: false, // Don't fetch automatically
+  });
 
   const replyMutation = useMutation({
     mutationFn: postReply,
@@ -44,7 +60,9 @@ export default function CommentItem({
       setGuestName("");
       setGuestPhone("");
       setShowReplyForm(false);
+      // Invalidate both comments and replies queries
       queryClient.invalidateQueries(["comments", listingId]);
+      queryClient.invalidateQueries(["replies", comment.id]);
       if (onReply) onReply();
     },
     onError: (error) => {
@@ -68,8 +86,26 @@ export default function CommentItem({
     });
   };
 
+  const handleLoadMoreReplies = async () => {
+    try {
+      const nextPage = repliesPage + 1;
+      const result = await fetchMoreReplies(comment.id, nextPage);
+
+      if (result.replies && result.replies.length > 0) {
+        setAllReplies([...allReplies, ...result.replies]);
+        setRepliesPage(nextPage);
+        toast.success(`Loaded ${result.replies.length} more replies`);
+      } else {
+        toast.info("No more replies to load");
+      }
+    } catch (error) {
+      toast.error("Failed to load more replies");
+    }
+  };
+
   const canReply = depth < 10;
-  const hasReplies = comment.replies && comment.replies.length > 0;
+  const hasReplies = allReplies.length > 0;
+  const remainingReplies = comment.replies_count - allReplies.length;
 
   return (
     <div
@@ -175,7 +211,7 @@ export default function CommentItem({
       {/* Child Replies - RECURSIVE */}
       {showReplies && hasReplies && (
         <div className="space-y-2">
-          {comment.replies.map((reply) => (
+          {allReplies.map((reply) => (
             <CommentItem
               key={reply.id}
               comment={reply}
@@ -188,16 +224,13 @@ export default function CommentItem({
       )}
 
       {/* Load More Replies Button */}
-      {comment.replies_count > (comment.replies?.length || 0) && (
+      {showReplies && remainingReplies > 0 && (
         <button
+          onClick={handleLoadMoreReplies}
           className="text-xs text-primary-600 hover:underline ml-6 mt-1"
-          onClick={() => {
-            // Load more replies - we'll implement this next
-            toast.info("Load more replies coming soon!");
-          }}
+          disabled={repliesPage >= Math.ceil(comment.replies_count / 10)}
         >
-          Load more replies (
-          {comment.replies_count - (comment.replies?.length || 0)})
+          Load more replies ({remainingReplies} remaining)
         </button>
       )}
     </div>
