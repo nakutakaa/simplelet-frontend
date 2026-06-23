@@ -10,6 +10,7 @@ import DashboardPage from "./pages/DashboardPage";
 import CreateListingPage from "./pages/CreateListingPage";
 import EditListingPage from "./pages/EditListingPage";
 import ListingDetailPage from "./pages/ListingDetailPage";
+import ProfilePage from "./pages/ProfilePage";
 
 function App() {
   return (
@@ -45,6 +46,14 @@ function App() {
             }
           />
           <Route path="/listing/:id" element={<ListingDetailPage />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute requireVerified={true}>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </Layout>
     </BrowserRouter>

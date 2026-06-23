@@ -42,6 +42,12 @@ export default function Layout({ children }) {
                   >
                     Post Ad
                   </Link>
+                  <Link
+                    to="/profile"
+                    className="text-gray-600 hover:text-primary-600 transition"
+                  >
+                    Profile
+                  </Link>
                   <button onClick={handleLogout} className="btn-outline">
                     Logout
                   </button>
