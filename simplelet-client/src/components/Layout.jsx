@@ -31,6 +31,12 @@ export default function Layout({ children }) {
               {token ? (
                 <>
                   <Link
+                    to="/favorites"
+                    className="text-gray-600 hover:text-primary-600 transition"
+                  >
+                    Favorites
+                  </Link>
+                  <Link
                     to="/dashboard"
                     className="text-gray-600 hover:text-primary-600 transition"
                   >

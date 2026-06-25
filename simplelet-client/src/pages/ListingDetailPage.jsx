@@ -78,6 +78,7 @@ export default function ListingDetailPage() {
   const [swiperOpen, setSwiperOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [commentContent, setCommentContent] = useState("");
+  const [isFavorited, setIsFavorited] = useState(false); // ✅ Only declare once
 
   // Check if user is logged in
   const token = localStorage.getItem("token");
@@ -93,6 +94,31 @@ export default function ListingDetailPage() {
   useEffect(() => {
     setIsAnonymous(!isLoggedIn);
   }, [isLoggedIn]);
+
+  // Check favorite status
+  useEffect(() => {
+    const checkFavorite = async () => {
+      if (!id) return;
+      try {
+        const { data } = await API.get(`/favorites/check/${id}`);
+        setIsFavorited(data.is_favorited);
+      } catch (error) {
+        console.error("Error checking favorite:", error);
+      }
+    };
+    checkFavorite();
+  }, [id]);
+
+  // Toggle favorite
+  const toggleFavorite = async () => {
+    try {
+      const { data } = await API.post(`/favorites/listings/${id}`);
+      setIsFavorited(data.is_favorited);
+      toast.success(data.message);
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to update favorite");
+    }
+  };
 
   // Fetch listing data
   const {
@@ -346,6 +372,31 @@ export default function ListingDetailPage() {
           </div>
         )}
 
+        {/* Favorite Button - NOW IN THE RIGHT PLACE */}
+        <button
+          onClick={toggleFavorite}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition mb-4 ${
+            isFavorited
+              ? "bg-red-100 text-red-600 hover:bg-red-200"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          <svg
+            className="w-5 h-5"
+            fill={isFavorited ? "currentColor" : "none"}
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+            />
+          </svg>
+          {isFavorited ? "Saved" : "Save"}
+        </button>
+
         {/* Property Details */}
         <div className="border-t border-gray-100 pt-4 mb-6">
           <h3 className="font-semibold text-lg mb-3">Property Details</h3>
@@ -456,7 +507,6 @@ export default function ListingDetailPage() {
           {/* Anonymous options */}
           <div className="flex items-center gap-4 flex-wrap">
             {isLoggedIn ? (
-              // Logged in user - can choose to comment anonymously
               <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
                 <input
                   type="checkbox"
@@ -468,7 +518,6 @@ export default function ListingDetailPage() {
                 <strong>{user?.name || "You"}</strong>)
               </label>
             ) : (
-              // Not logged in - always anonymous with optional name/phone
               <span className="text-xs text-gray-500">
                 <strong>Commenting as Guest</strong> - enter your name and phone
                 below (optional)
