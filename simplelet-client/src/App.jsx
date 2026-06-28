@@ -7,9 +7,9 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import VerifyPage from "./pages/VerifyPage";
 import DashboardPage from "./pages/DashboardPage";
+import ListingDetailPage from "./pages/ListingDetailPage";
 import CreateListingPage from "./pages/CreateListingPage";
 import EditListingPage from "./pages/EditListingPage";
-import ListingDetailPage from "./pages/ListingDetailPage";
 import ProfilePage from "./pages/ProfilePage";
 import FavoritesPage from "./pages/FavoritesPage";
 
@@ -18,10 +18,15 @@ function App() {
     <BrowserRouter>
       <Layout>
         <Routes>
+          {/* PUBLIC ROUTES - Anyone can view */}
           <Route path="/" element={<HomePage />} />
+          <Route path="/listing/:id" element={<ListingDetailPage />} />{" "}
+          {/* ✅ PUBLIC */}
+          {/* AUTH ROUTES - No login required */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/verify" element={<VerifyPage />} />
+          {/* PROTECTED ROUTES - Login required */}
           <Route
             path="/dashboard"
             element={
@@ -46,7 +51,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/listing/:id" element={<ListingDetailPage />} />
           <Route
             path="/profile"
             element={

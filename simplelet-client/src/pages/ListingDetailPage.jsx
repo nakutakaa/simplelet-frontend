@@ -1,6 +1,6 @@
 // src/pages/ListingDetailPage.jsx
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
@@ -39,34 +39,11 @@ const fetchComments = async (listingId) => {
   return data;
 };
 
-// Post comment with anonymous support
-const postComment = async ({
-  listingId,
-  content,
-  isAnonymous,
-  guestName,
-  guestPhone,
-}) => {
-  const isAnonymousBool = isAnonymous === true;
-
-  const payload = {
-    content: content,
-    is_anonymous: isAnonymousBool,
-  };
-
-  if (isAnonymousBool) {
-    if (guestName && guestName.trim()) {
-      payload.guest_name = guestName.trim();
-    }
-    if (guestPhone && guestPhone.trim()) {
-      payload.guest_phone = guestPhone.trim();
-    }
-  }
-
-  const { data } = await API.post(
-    `/comments/listings/${listingId}/comments`,
-    payload,
-  );
+// Post comment - ONLY for logged-in users
+const postComment = async ({ listingId, content }) => {
+  const { data } = await API.post(`/comments/listings/${listingId}/comments`, {
+    content,
+  });
   return data;
 };
 
@@ -78,27 +55,17 @@ export default function ListingDetailPage() {
   const [swiperOpen, setSwiperOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [commentContent, setCommentContent] = useState("");
-  const [isFavorited, setIsFavorited] = useState(false); // ✅ Only declare once
+  const [isFavorited, setIsFavorited] = useState(false);
 
   // Check if user is logged in
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "null");
   const isLoggedIn = !!token && user;
 
-  // Default to anonymous if not logged in
-  const [isAnonymous, setIsAnonymous] = useState(!isLoggedIn);
-  const [guestName, setGuestName] = useState("");
-  const [guestPhone, setGuestPhone] = useState("");
-
-  // Update anonymous state when login status changes
-  useEffect(() => {
-    setIsAnonymous(!isLoggedIn);
-  }, [isLoggedIn]);
-
-  // Check favorite status
+  // Check favorite status (only if logged in)
   useEffect(() => {
     const checkFavorite = async () => {
-      if (!id) return;
+      if (!id || !isLoggedIn) return;
       try {
         const { data } = await API.get(`/favorites/check/${id}`);
         setIsFavorited(data.is_favorited);
@@ -107,10 +74,15 @@ export default function ListingDetailPage() {
       }
     };
     checkFavorite();
-  }, [id]);
+  }, [id, isLoggedIn]);
 
-  // Toggle favorite
+  // Toggle favorite (only if logged in)
   const toggleFavorite = async () => {
+    if (!isLoggedIn) {
+      toast.error("Please login to save favorites");
+      navigate("/login");
+      return;
+    }
     try {
       const { data } = await API.post(`/favorites/listings/${id}`);
       setIsFavorited(data.is_favorited);
@@ -141,16 +113,12 @@ export default function ListingDetailPage() {
     enabled: !!id,
   });
 
-  // Post comment mutation
+  // Post comment mutation (ONLY for logged-in users)
   const commentMutation = useMutation({
     mutationFn: postComment,
     onSuccess: () => {
       toast.success("Comment posted!");
       setCommentContent("");
-      setGuestName("");
-      setGuestPhone("");
-      // Keep anonymous state based on login status
-      setIsAnonymous(!isLoggedIn);
       queryClient.invalidateQueries(["comments", id]);
       refetchComments();
     },
@@ -178,6 +146,11 @@ export default function ListingDetailPage() {
 
   const handleCommentSubmit = (e) => {
     e.preventDefault();
+    if (!isLoggedIn) {
+      toast.error("Please login to comment");
+      navigate("/login");
+      return;
+    }
     if (!commentContent.trim()) {
       toast.error("Please enter a comment");
       return;
@@ -186,19 +159,7 @@ export default function ListingDetailPage() {
     commentMutation.mutate({
       listingId: id,
       content: commentContent,
-      isAnonymous: isAnonymous,
-      guestName: isAnonymous ? guestName : undefined,
-      guestPhone: isAnonymous ? guestPhone : undefined,
     });
-  };
-
-  const handleAnonymousToggle = (e) => {
-    const checked = e.target.checked;
-    setIsAnonymous(checked);
-    if (!checked) {
-      setGuestName("");
-      setGuestPhone("");
-    }
   };
 
   if (isLoading) {
@@ -372,30 +333,51 @@ export default function ListingDetailPage() {
           </div>
         )}
 
-        {/* Favorite Button - NOW IN THE RIGHT PLACE */}
-        <button
-          onClick={toggleFavorite}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition mb-4 ${
-            isFavorited
-              ? "bg-red-100 text-red-600 hover:bg-red-200"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-          }`}
-        >
-          <svg
-            className="w-5 h-5"
-            fill={isFavorited ? "currentColor" : "none"}
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        {/* Favorite Button - Only for logged-in users */}
+        {isLoggedIn ? (
+          <button
+            onClick={toggleFavorite}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition mb-4 ${
+              isFavorited
+                ? "bg-red-100 text-red-600 hover:bg-red-200"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-            />
-          </svg>
-          {isFavorited ? "Saved" : "Save"}
-        </button>
+            <svg
+              className="w-5 h-5"
+              fill={isFavorited ? "currentColor" : "none"}
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+            {isFavorited ? "Saved" : "Save"}
+          </button>
+        ) : (
+          <Link to="/login" className="inline-block mb-4">
+            <button className="flex items-center gap-2 px-4 py-2 rounded-lg transition bg-gray-100 text-gray-600 hover:bg-gray-200">
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                />
+              </svg>
+              Login to Save
+            </button>
+          </Link>
+        )}
 
         {/* Property Details */}
         <div className="border-t border-gray-100 pt-4 mb-6">
@@ -481,12 +463,9 @@ export default function ListingDetailPage() {
           )}
         </h3>
 
-        {/* Comment Input with Anonymous Option */}
-        <form
-          onSubmit={handleCommentSubmit}
-          className="flex flex-col gap-3 mb-6"
-        >
-          <div className="flex gap-3">
+        {/* Comment Input - ONLY for logged-in users */}
+        {isLoggedIn ? (
+          <form onSubmit={handleCommentSubmit} className="flex gap-3 mb-6">
             <input
               type="text"
               value={commentContent}
@@ -502,48 +481,23 @@ export default function ListingDetailPage() {
             >
               {commentMutation.isPending ? "Posting..." : "Post"}
             </button>
+          </form>
+        ) : (
+          <div className="bg-gray-50 rounded-lg p-4 mb-6 text-center">
+            <p className="text-gray-600 mb-2">Want to join the conversation?</p>
+            <div className="flex justify-center gap-3">
+              <Link to="/login" className="btn-primary text-sm">
+                Login
+              </Link>
+              <Link to="/register" className="btn-outline text-sm">
+                Register
+              </Link>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              Login or register to comment on this listing
+            </p>
           </div>
-
-          {/* Anonymous options */}
-          <div className="flex items-center gap-4 flex-wrap">
-            {isLoggedIn ? (
-              <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isAnonymous}
-                  onChange={handleAnonymousToggle}
-                  className="rounded cursor-pointer"
-                />
-                Comment as Guest (currently:{" "}
-                <strong>{user?.name || "You"}</strong>)
-              </label>
-            ) : (
-              <span className="text-xs text-gray-500">
-                <strong>Commenting as Guest</strong> - enter your name and phone
-                below (optional)
-              </span>
-            )}
-
-            {isAnonymous && (
-              <div className="flex gap-2 flex-wrap">
-                <input
-                  type="text"
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  placeholder="Your name (optional)"
-                  className="input text-sm py-1 w-40"
-                />
-                <input
-                  type="tel"
-                  value={guestPhone}
-                  onChange={(e) => setGuestPhone(e.target.value)}
-                  placeholder="Phone (optional)"
-                  className="input text-sm py-1 w-40"
-                />
-              </div>
-            )}
-          </div>
-        </form>
+        )}
 
         {/* Comments List */}
         <div className="space-y-4">
