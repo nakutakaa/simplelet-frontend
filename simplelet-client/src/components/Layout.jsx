@@ -1,11 +1,14 @@
 // src/components/Layout.jsx
 import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import API from "../services/api";
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "null");
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -13,6 +16,24 @@ export default function Layout({ children }) {
     toast.success("Logged out successfully");
     navigate("/");
   };
+
+  // Fetch unread message count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (!token) return;
+      try {
+        const { data } = await API.get("/messages/unread-count");
+        setUnreadCount(data.unread_count || 0);
+      } catch (error) {
+        console.error("Error fetching unread count:", error);
+      }
+    };
+
+    fetchUnreadCount();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -53,6 +74,17 @@ export default function Layout({ children }) {
                     className="text-gray-600 hover:text-primary-600 transition"
                   >
                     Profile
+                  </Link>
+                  <Link
+                    to="/messages"
+                    className="text-gray-600 hover:text-primary-600 transition relative"
+                  >
+                    Messages
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-3 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
                   </Link>
                   <button onClick={handleLogout} className="btn-outline">
                     Logout

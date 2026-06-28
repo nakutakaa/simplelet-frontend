@@ -450,75 +450,89 @@ export default function ListingDetailPage() {
             </div>
           )}
         </div>
-      </div>
 
-      {/* Comments Section */}
-      <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
-        <h3 className="font-semibold text-lg mb-4">
-          Comments
-          {commentsData && (
-            <span className="text-sm text-gray-500 ml-2">
-              ({commentsData.total})
-            </span>
-          )}
-        </h3>
-
-        {/* Comment Input - ONLY for logged-in users */}
-        {isLoggedIn ? (
-          <form onSubmit={handleCommentSubmit} className="flex gap-3 mb-6">
-            <input
-              type="text"
-              value={commentContent}
-              onChange={(e) => setCommentContent(e.target.value)}
-              placeholder="Write a comment..."
-              className="flex-1 input"
-              disabled={commentMutation.isPending}
-            />
-            <button
-              type="submit"
-              disabled={commentMutation.isPending || !commentContent.trim()}
-              className="btn-primary px-6"
+        {/* Message Seller Button - Only for logged-in users who are not the owner */}
+        {isLoggedIn && listing.author?.id !== user?.id && (
+          <div className="border-t border-gray-100 pt-6 mt-6">
+            <Link
+              to={`/messages/${id}`}
+              className="w-full btn-secondary text-center block"
             >
-              {commentMutation.isPending ? "Posting..." : "Post"}
-            </button>
-          </form>
-        ) : (
-          <div className="bg-gray-50 rounded-lg p-4 mb-6 text-center">
-            <p className="text-gray-600 mb-2">Want to join the conversation?</p>
-            <div className="flex justify-center gap-3">
-              <Link to="/login" className="btn-primary text-sm">
-                Login
-              </Link>
-              <Link to="/register" className="btn-outline text-sm">
-                Register
-              </Link>
-            </div>
-            <p className="text-xs text-gray-400 mt-2">
-              Login or register to comment on this listing
-            </p>
+              Message Seller
+            </Link>
           </div>
         )}
 
-        {/* Comments List */}
-        <div className="space-y-4">
-          {commentsLoading ? (
-            <div className="flex justify-center py-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
-            </div>
-          ) : commentsData?.comments?.length > 0 ? (
-            commentsData.comments.map((comment) => (
-              <CommentItem
-                key={comment.id}
-                comment={comment}
-                listingId={id}
-                onReply={refetchComments}
+        {/* Comments Section */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
+          <h3 className="font-semibold text-lg mb-4">
+            Comments
+            {commentsData && (
+              <span className="text-sm text-gray-500 ml-2">
+                ({commentsData.total})
+              </span>
+            )}
+          </h3>
+
+          {/* Comment Input - ONLY for logged-in users */}
+          {isLoggedIn ? (
+            <form onSubmit={handleCommentSubmit} className="flex gap-3 mb-6">
+              <input
+                type="text"
+                value={commentContent}
+                onChange={(e) => setCommentContent(e.target.value)}
+                placeholder="Write a comment..."
+                className="flex-1 input"
+                disabled={commentMutation.isPending}
               />
-            ))
+              <button
+                type="submit"
+                disabled={commentMutation.isPending || !commentContent.trim()}
+                className="btn-primary px-6"
+              >
+                {commentMutation.isPending ? "Posting..." : "Post"}
+              </button>
+            </form>
           ) : (
-            <p className="text-gray-500 text-center py-4">
-              No comments yet. Be the first to comment!
-            </p>
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-center">
+              <p className="text-gray-600 mb-2">
+                Want to join the conversation?
+              </p>
+              <div className="flex justify-center gap-3">
+                <Link to="/login" className="btn-primary text-sm">
+                  Login
+                </Link>
+                <Link to="/register" className="btn-outline text-sm">
+                  Register
+                </Link>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                Login or register to comment on this listing
+              </p>
+            </div>
           )}
+
+          {/* Comments List */}
+          <div className="space-y-4">
+            {commentsLoading ? (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
+              </div>
+            ) : commentsData?.comments?.length > 0 ? (
+              commentsData.comments.map((comment) => (
+                <CommentItem
+                  key={comment.id}
+                  comment={comment}
+                  listingId={id}
+                  onReply={refetchComments}
+                />
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-4">
+                No comments yet. Be the first to comment!
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
