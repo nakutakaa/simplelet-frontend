@@ -5,20 +5,45 @@ import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
 
-const loginUser = async (credentials) => {
-  const { data } = await API.post("/auth/login", credentials);
+const sendLoginCode = async ({ phone, password }) => {
+  const { data } = await API.post("/auth/send-login-code", { phone, password });
+  return data;
+};
+
+const verifyAndLogin = async ({ phone, code }) => {
+  const { data } = await API.post("/auth/verify-and-login", { phone, code });
   return data;
 };
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    phone: "",
-    password: "",
+  const [step, setStep] = useState(1);
+  const [showPassword, setShowPassword] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+
+  const sendCodeMutation = useMutation({
+    mutationFn: sendLoginCode,
+    onSuccess: (data) => {
+      toast.success(
+        data.message || "Verification code sent! Check your phone.",
+      );
+      setStep(2);
+    },
+    onError: (error) => {
+      const errorMsg = error.response?.data?.error || "Failed to send code";
+      toast.error(errorMsg);
+
+      if (error.response?.status === 404) {
+        toast.error("No account found with this phone number");
+        setTimeout(() => navigate("/register"), 2000);
+      }
+    },
   });
 
-  const mutation = useMutation({
-    mutationFn: loginUser,
+  const loginMutation = useMutation({
+    mutationFn: verifyAndLogin,
     onSuccess: (data) => {
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
@@ -26,29 +51,30 @@ export default function LoginPage() {
       navigate("/");
     },
     onError: (error) => {
-      if (error.response?.data?.verification_required) {
-        toast.error("Please verify your phone number first");
-        if (error.response?.data?.user_id) {
-          localStorage.setItem(
-            "pendingVerificationUserId",
-            error.response.data.user_id,
-          );
-        }
-        localStorage.setItem("pendingVerificationPhone", formData.phone);
-        navigate("/verify");
-      } else {
-        toast.error(error.response?.data?.error || "Login failed");
+      const errorMsg = error.response?.data?.error || "Verification failed";
+      toast.error(errorMsg);
+      if (errorMsg.includes("expired")) {
+        setStep(1);
       }
     },
   });
 
-  const handleSubmit = (e) => {
+  const handleSendCode = (e) => {
     e.preventDefault();
-    mutation.mutate(formData);
+    if (!phone || !password) {
+      toast.error("Please enter your phone number and password");
+      return;
+    }
+    sendCodeMutation.mutate({ phone, password });
   };
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleVerify = (e) => {
+    e.preventDefault();
+    if (!code || code.length !== 6) {
+      toast.error("Please enter the 6-digit code");
+      return;
+    }
+    loginMutation.mutate({ phone, code });
   };
 
   return (
@@ -58,41 +84,95 @@ export default function LoginPage() {
           Login to SimpleLet
         </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="label">Phone Number</label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="+254712345678"
-              className="input"
-              required
-            />
-          </div>
+        {step === 1 ? (
+          <form onSubmit={handleSendCode} className="space-y-4">
+            <div>
+              <label className="label">Phone Number</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+254712345678"
+                className="input"
+                required
+              />
+            </div>
 
-          <div>
-            <label className="label">Password</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Enter your password"
-              className="input"
-              required
-            />
-          </div>
+            <div>
+              <label className="label">Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="input pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition"
+                >
+                  {showPassword ? "🙈" : "👁️"}
+                </button>
+              </div>
+            </div>
 
-          <button
-            type="submit"
-            disabled={mutation.isPending}
-            className="w-full btn-primary"
-          >
-            {mutation.isPending ? "Logging in..." : "Login"}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={sendCodeMutation.isPending}
+              className="w-full btn-primary"
+            >
+              {sendCodeMutation.isPending
+                ? "Sending code..."
+                : "Send Verification Code"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleVerify} className="space-y-4">
+            <div className="bg-black/50 border border-white/10 rounded-xl p-3 text-center">
+              <p className="text-sm text-gray-400">
+                We sent a code to <span className="text-white">{phone}</span>
+              </p>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Code expires in 10 minutes
+              </p>
+            </div>
+
+            <div>
+              <label className="label">Verification Code</label>
+              <input
+                type="text"
+                value={code}
+                onChange={(e) =>
+                  setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+                placeholder="123456"
+                maxLength={6}
+                className="input text-center text-2xl tracking-widest font-mono"
+                required
+                autoFocus
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loginMutation.isPending}
+              className="w-full btn-primary"
+            >
+              {loginMutation.isPending ? "Verifying..." : "Verify & Login"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="w-full text-sm text-gray-400 hover:text-white transition"
+            >
+              ← Use different credentials
+            </button>
+          </form>
+        )}
 
         <p className="text-center text-sm text-gray-400 mt-6">
           Don't have an account?{" "}
