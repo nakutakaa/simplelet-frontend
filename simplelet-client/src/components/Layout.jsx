@@ -1,14 +1,11 @@
 // src/components/Layout.jsx
 import { Link, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import API from "../services/api";
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "null");
-  const [unreadCount, setUnreadCount] = useState(0);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -16,22 +13,6 @@ export default function Layout({ children }) {
     toast.success("Logged out successfully");
     navigate("/");
   };
-
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
-      if (!token) return;
-      try {
-        const { data } = await API.get("/messages/unread-count");
-        setUnreadCount(data.unread_count || 0);
-      } catch (error) {
-        console.error("Error fetching unread count:", error);
-      }
-    };
-
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, [token]);
 
   return (
     <div className="min-h-screen bg-black flex flex-col">
@@ -56,17 +37,6 @@ export default function Layout({ children }) {
                     className="text-gray-300 hover:text-white transition text-sm"
                   >
                     Favorites
-                  </Link>
-                  <Link
-                    to="/messages"
-                    className="text-gray-300 hover:text-white transition text-sm relative"
-                  >
-                    Messages
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-3 bg-gradient-to-r from-red-500 to-red-600 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center animate-pulse">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
-                    )}
                   </Link>
                   <Link
                     to="/dashboard"

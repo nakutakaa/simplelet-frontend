@@ -457,18 +457,6 @@ export default function ListingDetailPage() {
           )}
         </div>
 
-        {/* Message Seller Button - Only for logged-in users who are not the owner */}
-        {isLoggedIn && listing.author?.id !== user?.id && (
-          <div className="border-t border-white/10 pt-6 mt-6">
-            <Link
-              to={`/messages/${id}`}
-              className="w-full btn-secondary text-center block"
-            >
-              Message Seller
-            </Link>
-          </div>
-        )}
-
         {/* Comments Section */}
         <div className="bg-black rounded-2xl border border-white/10 p-4 sm:p-6 mt-6">
           <h3 className="text-lg font-semibold text-white mb-4">
