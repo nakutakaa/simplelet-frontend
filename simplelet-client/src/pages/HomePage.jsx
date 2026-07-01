@@ -34,7 +34,6 @@ const fetchListings = async (params) => {
 export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Get search params from URL
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || "",
     house_type: searchParams.get("house_type") || "",
@@ -49,7 +48,6 @@ export default function HomePage() {
     queryFn: () => fetchListings(filters),
   });
 
-  // Update URL when filters change
   useEffect(() => {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
@@ -82,7 +80,7 @@ export default function HomePage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-blue-500"></div>
       </div>
     );
   }
@@ -91,7 +89,7 @@ export default function HomePage() {
     toast.error("Failed to load listings");
     return (
       <div className="text-center py-12">
-        <p className="text-red-500">
+        <p className="text-red-400">
           Failed to load listings. Please try again.
         </p>
       </div>
@@ -101,29 +99,40 @@ export default function HomePage() {
   const listings = data?.listings || [];
 
   return (
-    <div>
-      {/* Search and Filter Bar */}
-      <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-        <form onSubmit={handleSearchSubmit} className="space-y-4">
-          <div className="flex flex-wrap gap-3">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Search and Filter Bar - FULL BLACK */}
+      <div className="bg-black rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
+        <form onSubmit={handleSearchSubmit} className="space-y-3 sm:space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
               name="search"
               value={filters.search}
               onChange={handleFilterChange}
-              placeholder="Search by title, location, or description..."
-              className="flex-1 min-w-[200px] input"
+              placeholder="Search properties..."
+              className="flex-1 input"
             />
-            <button type="submit" className="btn-primary">
+            <button type="submit" className="btn-primary w-full sm:w-auto">
+              <svg
+                className="w-4 h-4 sm:w-5 sm:h-5 inline mr-1.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
               Search
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[150px]">
-              <label className="text-xs text-gray-500 block mb-1">
-                Property Type
-              </label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
+            <div>
+              <label className="label">Type</label>
               <select
                 name="house_type"
                 value={filters.house_type}
@@ -138,10 +147,8 @@ export default function HomePage() {
               </select>
             </div>
 
-            <div className="flex-1 min-w-[150px]">
-              <label className="text-xs text-gray-500 block mb-1">
-                Location
-              </label>
+            <div>
+              <label className="label">Location</label>
               <input
                 type="text"
                 name="location"
@@ -152,10 +159,8 @@ export default function HomePage() {
               />
             </div>
 
-            <div className="flex-1 min-w-[150px]">
-              <label className="text-xs text-gray-500 block mb-1">
-                Min Price
-              </label>
+            <div>
+              <label className="label">Min Price</label>
               <input
                 type="number"
                 name="price_min"
@@ -166,10 +171,8 @@ export default function HomePage() {
               />
             </div>
 
-            <div className="flex-1 min-w-[150px]">
-              <label className="text-xs text-gray-500 block mb-1">
-                Max Price
-              </label>
+            <div>
+              <label className="label">Max Price</label>
               <input
                 type="number"
                 name="price_max"
@@ -180,10 +183,8 @@ export default function HomePage() {
               />
             </div>
 
-            <div className="flex-1 min-w-[150px]">
-              <label className="text-xs text-gray-500 block mb-1">
-                Sort By
-              </label>
+            <div>
+              <label className="label">Sort By</label>
               <select
                 name="sort_by"
                 value={filters.sort_by}
@@ -204,16 +205,16 @@ export default function HomePage() {
             filters.location ||
             filters.price_min ||
             filters.price_max) && (
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 border-t border-white/10 pt-3">
               <span className="text-xs text-gray-500">
                 {data?.total || 0} results found
               </span>
               <button
                 type="button"
                 onClick={clearFilters}
-                className="text-xs text-primary-600 hover:underline"
+                className="text-xs text-blue-400 hover:text-blue-300 transition"
               >
-                Clear all filters
+                Clear all filters ✕
               </button>
             </div>
           )}
@@ -222,55 +223,68 @@ export default function HomePage() {
 
       {/* Listings Grid */}
       {listings.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500">
+        <div className="text-center py-12 sm:py-16 bg-black rounded-2xl border border-white/10">
+          <svg
+            className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-3 sm:mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+            />
+          </svg>
+          <p className="text-gray-400 text-sm sm:text-base">
             No listings found. Try adjusting your filters or{" "}
             <Link
               to="/create-listing"
-              className="text-primary-600 hover:underline"
+              className="text-blue-400 hover:text-blue-300 transition"
             >
               post your own listing!
             </Link>
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
           {listings.map((listing) => (
             <Link key={listing.id} to={`/listing/${listing.id}`}>
-              <div className="card group cursor-pointer transition-transform hover:scale-[1.02]">
-                {listing.cover_image ? (
-                  <div className="w-full h-48 bg-gray-100 overflow-hidden">
+              <div className="card group">
+                <div className="aspect-[4/3] bg-[#0a0a0a] overflow-hidden">
+                  {listing.cover_image ? (
                     <img
                       src={listing.cover_image}
                       alt={listing.title}
-                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       loading="lazy"
                     />
-                  </div>
-                ) : (
-                  <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
-                    <svg
-                      className="w-12 h-12 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
-                )}
-                <div className="p-4">
-                  <h3 className="font-semibold text-lg mb-1 line-clamp-1">
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <svg
+                        className="w-12 h-12 sm:w-16 sm:h-16 text-gray-700"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <div className="p-3 sm:p-4">
+                  <h3 className="font-semibold text-sm sm:text-base mb-0.5 line-clamp-1 text-white group-hover:text-blue-400 transition">
                     {listing.title}
                   </h3>
-                  <p className="text-gray-500 text-sm mb-2 flex items-center gap-1">
+                  <p className="text-gray-500 text-xs sm:text-sm mb-1.5 flex items-center gap-1">
                     <svg
-                      className="w-4 h-4"
+                      className="w-3 h-3 sm:w-4 sm:h-4"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -290,11 +304,11 @@ export default function HomePage() {
                     </svg>
                     {listing.location}
                   </p>
-                  <p className="text-primary-600 font-bold text-xl">
+                  <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-base sm:text-xl">
                     KSh {listing.price?.toLocaleString()}
                   </p>
                   {listing.is_taken && (
-                    <span className="inline-block mt-2 bg-red-100 text-red-700 text-xs px-2 py-1 rounded">
+                    <span className="inline-block mt-1.5 bg-red-500/20 text-red-400 text-[10px] sm:text-xs px-2 py-0.5 rounded-full border border-red-500/20">
                       Taken
                     </span>
                   )}

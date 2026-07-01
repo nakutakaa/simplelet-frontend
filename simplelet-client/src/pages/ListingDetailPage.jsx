@@ -165,7 +165,7 @@ export default function ListingDetailPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
       </div>
     );
   }
@@ -173,7 +173,7 @@ export default function ListingDetailPage() {
   if (error || !listing) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-500">Listing not found</p>
+        <p className="text-red-400">Listing not found</p>
         <button onClick={() => navigate("/")} className="btn-primary mt-4">
           Back to Home
         </button>
@@ -186,7 +186,7 @@ export default function ListingDetailPage() {
   return (
     <div className="max-w-4xl mx-auto pb-8">
       {/* Image Gallery */}
-      <div className="bg-black rounded-xl overflow-hidden mb-6">
+      <div className="bg-black rounded-2xl border border-white/10 overflow-hidden mb-6">
         {hasImages ? (
           <div>
             {/* Main Image - Optimized */}
@@ -223,7 +223,7 @@ export default function ListingDetailPage() {
                   <button
                     key={image.id}
                     onClick={() => openImageSwiper(idx)}
-                    className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 border-transparent hover:border-primary-500 transition"
+                    className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 transition"
                   >
                     <img
                       src={getThumbnailUrl(image.url)}
@@ -236,7 +236,7 @@ export default function ListingDetailPage() {
                 {listing.images.length > 5 && (
                   <button
                     onClick={() => openImageSwiper(5)}
-                    className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-800 flex items-center justify-center text-white text-sm"
+                    className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-[#1a1a1a] flex items-center justify-center text-white text-sm border border-white/10 hover:border-blue-500 transition"
                   >
                     +{listing.images.length - 5}
                   </button>
@@ -245,9 +245,9 @@ export default function ListingDetailPage() {
             )}
           </div>
         ) : (
-          <div className="h-[400px] bg-gray-200 flex items-center justify-center">
+          <div className="h-[400px] bg-[#0a0a0a] flex items-center justify-center">
             <svg
-              className="w-24 h-24 text-gray-400"
+              className="w-24 h-24 text-gray-700"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -275,21 +275,19 @@ export default function ListingDetailPage() {
       )}
 
       {/* Listing Details */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
+      <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
         {/* Title & Status */}
         <div className="flex justify-between items-start mb-4">
-          <h1 className="text-2xl font-bold">{listing.title}</h1>
-          {listing.is_taken && (
-            <span className="bg-red-100 text-red-700 text-sm px-3 py-1 rounded-full">
-              Taken
-            </span>
-          )}
+          <h1 className="text-xl sm:text-2xl font-bold text-white">
+            {listing.title}
+          </h1>
+          {listing.is_taken && <span className="badge-red">Taken</span>}
         </div>
 
         {/* Location */}
-        <div className="flex items-center gap-2 text-gray-500 mb-4">
+        <div className="flex items-center gap-2 text-gray-400 text-sm mb-4">
           <svg
-            className="w-5 h-5"
+            className="w-4 h-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -312,7 +310,7 @@ export default function ListingDetailPage() {
 
         {/* Price */}
         <div className="mb-4">
-          <p className="text-3xl font-bold text-primary-600">
+          <p className="text-2xl sm:text-3xl font-bold text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text">
             KSh {listing.price?.toLocaleString()}
             {listing.price && (
               <span className="text-sm font-normal text-gray-500">
@@ -326,8 +324,10 @@ export default function ListingDetailPage() {
         {/* Description */}
         {listing.description && (
           <div className="mb-6">
-            <h3 className="font-semibold text-lg mb-2">Description</h3>
-            <p className="text-gray-700 whitespace-pre-wrap">
+            <h3 className="text-sm font-semibold text-gray-300 mb-2">
+              Description
+            </h3>
+            <p className="text-gray-400 text-sm whitespace-pre-wrap">
               {listing.description}
             </p>
           </div>
@@ -337,10 +337,10 @@ export default function ListingDetailPage() {
         {isLoggedIn ? (
           <button
             onClick={toggleFavorite}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition mb-4 ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition mb-4 ${
               isFavorited
-                ? "bg-red-100 text-red-600 hover:bg-red-200"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                ? "bg-red-500/20 text-red-400 border border-red-500/20 hover:bg-red-500/30"
+                : "bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
             }`}
           >
             <svg
@@ -360,7 +360,7 @@ export default function ListingDetailPage() {
           </button>
         ) : (
           <Link to="/login" className="inline-block mb-4">
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg transition bg-gray-100 text-gray-600 hover:bg-gray-200">
+            <button className="flex items-center gap-2 px-4 py-2 rounded-xl transition bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10">
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -380,27 +380,33 @@ export default function ListingDetailPage() {
         )}
 
         {/* Property Details */}
-        <div className="border-t border-gray-100 pt-4 mb-6">
-          <h3 className="font-semibold text-lg mb-3">Property Details</h3>
+        <div className="border-t border-white/10 pt-4 mb-6">
+          <h3 className="text-sm font-semibold text-gray-300 mb-3">
+            Property Details
+          </h3>
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-xs text-gray-500">Property Type</p>
-              <p className="font-medium">{listing.house_type_display}</p>
+            <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+              <p className="text-[10px] text-gray-500">Property Type</p>
+              <p className="font-medium text-white text-sm">
+                {listing.house_type_display}
+              </p>
             </div>
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-xs text-gray-500">Posted By</p>
-              <p className="font-medium">{listing.author?.name}</p>
+            <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+              <p className="text-[10px] text-gray-500">Posted By</p>
+              <p className="font-medium text-white text-sm">
+                {listing.author?.name}
+              </p>
             </div>
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-xs text-gray-500">Posted On</p>
-              <p className="font-medium">
+            <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+              <p className="text-[10px] text-gray-500">Posted On</p>
+              <p className="font-medium text-white text-sm">
                 {new Date(listing.created_at).toLocaleDateString()}
               </p>
             </div>
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-xs text-gray-500">Status</p>
+            <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+              <p className="text-[10px] text-gray-500">Status</p>
               <p
-                className={`font-medium ${listing.is_taken ? "text-red-600" : "text-green-600"}`}
+                className={`font-medium text-sm ${listing.is_taken ? "text-red-400" : "text-green-400"}`}
               >
                 {listing.is_taken ? "Taken" : "Available"}
               </p>
@@ -409,24 +415,24 @@ export default function ListingDetailPage() {
         </div>
 
         {/* Contact Section */}
-        <div className="border-t border-gray-100 pt-6">
+        <div className="border-t border-white/10 pt-6">
           {!showContact ? (
             <button onClick={handleContactClick} className="w-full btn-primary">
               Reveal Contact Number
             </button>
           ) : (
-            <div className="bg-gray-50 rounded-lg p-4 text-center">
-              <p className="text-sm text-gray-600 mb-2">Contact Seller</p>
+            <div className="bg-black/50 border border-white/10 rounded-xl p-4 text-center">
+              <p className="text-sm text-gray-400 mb-2">Contact Seller</p>
               <div className="flex items-center justify-center gap-3">
                 <a
                   href={`tel:${listing.contact_phone}`}
-                  className="text-primary-600 font-semibold text-lg"
+                  className="text-blue-400 font-semibold text-lg hover:text-blue-300 transition"
                 >
                   {listing.contact_phone}
                 </a>
                 <button
                   onClick={handleCopyPhone}
-                  className="text-gray-500 hover:text-primary-600"
+                  className="text-gray-400 hover:text-white transition"
                   title="Copy to clipboard"
                 >
                   <svg
@@ -444,7 +450,7 @@ export default function ListingDetailPage() {
                   </svg>
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-[10px] text-gray-500 mt-2">
                 Click to call or copy the number
               </p>
             </div>
@@ -453,7 +459,7 @@ export default function ListingDetailPage() {
 
         {/* Message Seller Button - Only for logged-in users who are not the owner */}
         {isLoggedIn && listing.author?.id !== user?.id && (
-          <div className="border-t border-gray-100 pt-6 mt-6">
+          <div className="border-t border-white/10 pt-6 mt-6">
             <Link
               to={`/messages/${id}`}
               className="w-full btn-secondary text-center block"
@@ -464,8 +470,8 @@ export default function ListingDetailPage() {
         )}
 
         {/* Comments Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
-          <h3 className="font-semibold text-lg mb-4">
+        <div className="bg-black rounded-2xl border border-white/10 p-4 sm:p-6 mt-6">
+          <h3 className="text-lg font-semibold text-white mb-4">
             Comments
             {commentsData && (
               <span className="text-sm text-gray-500 ml-2">
@@ -494,8 +500,8 @@ export default function ListingDetailPage() {
               </button>
             </form>
           ) : (
-            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-center">
-              <p className="text-gray-600 mb-2">
+            <div className="bg-black/50 border border-white/10 rounded-xl p-4 mb-6 text-center">
+              <p className="text-gray-400 text-sm mb-2">
                 Want to join the conversation?
               </p>
               <div className="flex justify-center gap-3">
@@ -506,7 +512,7 @@ export default function ListingDetailPage() {
                   Register
                 </Link>
               </div>
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-[10px] text-gray-500 mt-2">
                 Login or register to comment on this listing
               </p>
             </div>
@@ -516,7 +522,7 @@ export default function ListingDetailPage() {
           <div className="space-y-4">
             {commentsLoading ? (
               <div className="flex justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
               </div>
             ) : commentsData?.comments?.length > 0 ? (
               commentsData.comments.map((comment) => (
@@ -528,7 +534,7 @@ export default function ListingDetailPage() {
                 />
               ))
             ) : (
-              <p className="text-gray-500 text-center py-4">
+              <p className="text-gray-500 text-center py-4 text-sm">
                 No comments yet. Be the first to comment!
               </p>
             )}

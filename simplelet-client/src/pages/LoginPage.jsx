@@ -4,39 +4,21 @@ import { useNavigate, Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
-import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
-const sendLoginCode = async ({ phone, password }) => {
-  const { data } = await API.post("/auth/send-login-code", { phone, password });
-  return data;
-};
-
-const verifyAndLogin = async ({ phone, code }) => {
-  const { data } = await API.post("/auth/verify-and-login", { phone, code });
+const loginUser = async (credentials) => {
+  const { data } = await API.post("/auth/login", credentials);
   return data;
 };
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
-  const [showPassword, setShowPassword] = useState(false);
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-
-  const sendCodeMutation = useMutation({
-    mutationFn: sendLoginCode,
-    onSuccess: () => {
-      toast.success("Verification code sent! Check your phone.");
-      setStep(2);
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.error || "Failed to send code");
-    },
+  const [formData, setFormData] = useState({
+    phone: "",
+    password: "",
   });
 
-  const loginMutation = useMutation({
-    mutationFn: verifyAndLogin,
+  const mutation = useMutation({
+    mutationFn: loginUser,
     onSuccess: (data) => {
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
@@ -44,135 +26,80 @@ export default function LoginPage() {
       navigate("/");
     },
     onError: (error) => {
-      toast.error(error.response?.data?.error || "Verification failed");
+      if (error.response?.data?.verification_required) {
+        toast.error("Please verify your phone number first");
+        if (error.response?.data?.user_id) {
+          localStorage.setItem(
+            "pendingVerificationUserId",
+            error.response.data.user_id,
+          );
+        }
+        localStorage.setItem("pendingVerificationPhone", formData.phone);
+        navigate("/verify");
+      } else {
+        toast.error(error.response?.data?.error || "Login failed");
+      }
     },
   });
 
-  const handleSendCode = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (!phone || !password) {
-      toast.error("Please enter your phone number and password");
-      return;
-    }
-    sendCodeMutation.mutate({ phone, password });
+    mutation.mutate(formData);
   };
 
-  const handleVerify = (e) => {
-    e.preventDefault();
-    if (!code || code.length !== 6) {
-      toast.error("Please enter the 6-digit code");
-      return;
-    }
-    loginMutation.mutate({ phone, code });
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   return (
     <div className="max-w-md mx-auto">
-      <div className="bg-white rounded-xl shadow-sm p-8">
-        <h2 className="text-2xl font-bold text-center mb-6">
+      <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-6 sm:p-8 shadow-xl">
+        <h2 className="text-2xl font-bold text-center mb-6 heading-gradient">
           Login to SimpleLet
         </h2>
 
-        {step === 1 ? (
-          <form onSubmit={handleSendCode} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone Number
-              </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+254712345678"
-                className="input"
-                required
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="label">Phone Number</label>
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              placeholder="+254712345678"
+              className="input"
+              required
+            />
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="input pr-10"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                >
-                  {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400" />
-                  )}
-                </button>
-              </div>
-            </div>
+          <div>
+            <label className="label">Password</label>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Enter your password"
+              className="input"
+              required
+            />
+          </div>
 
-            <button
-              type="submit"
-              disabled={sendCodeMutation.isPending}
-              className="w-full btn-primary disabled:opacity-50"
-            >
-              {sendCodeMutation.isPending
-                ? "Sending code..."
-                : "Send Verification Code"}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerify} className="space-y-4">
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600">
-                We sent a code to <strong>{phone}</strong>
-              </p>
-            </div>
+          <button
+            type="submit"
+            disabled={mutation.isPending}
+            className="w-full btn-primary"
+          >
+            {mutation.isPending ? "Logging in..." : "Login"}
+          </button>
+        </form>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Verification Code
-              </label>
-              <input
-                type="text"
-                value={code}
-                onChange={(e) =>
-                  setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
-                }
-                placeholder="123456"
-                maxLength={6}
-                className="input text-center text-2xl tracking-widest font-mono"
-                required
-                autoFocus
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loginMutation.isPending}
-              className="w-full btn-primary disabled:opacity-50"
-            >
-              {loginMutation.isPending ? "Verifying..." : "Verify & Login"}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              className="w-full text-sm text-gray-500 hover:text-gray-700"
-            >
-              ← Use different phone number
-            </button>
-          </form>
-        )}
-
-        <p className="text-center text-sm text-gray-600 mt-6">
+        <p className="text-center text-sm text-gray-400 mt-6">
           Don't have an account?{" "}
-          <Link to="/register" className="text-primary-600 hover:underline">
+          <Link
+            to="/register"
+            className="text-blue-400 hover:text-blue-300 transition"
+          >
             Register here
           </Link>
         </p>

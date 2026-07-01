@@ -4,7 +4,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
-import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 const sendRegistrationCode = async (phone) => {
   const { data } = await API.post("/auth/send-registration-code", { phone });
@@ -100,17 +99,15 @@ export default function RegisterPage() {
 
   return (
     <div className="max-w-md mx-auto">
-      <div className="bg-white rounded-xl shadow-sm p-8">
-        <h2 className="text-2xl font-bold text-center mb-6">
+      <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-6 sm:p-8 shadow-xl">
+        <h2 className="text-2xl font-bold text-center mb-6 heading-gradient">
           Create an Account
         </h2>
 
         {step === 1 ? (
           <form onSubmit={handleSendCode} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name
-              </label>
+              <label className="label">Full Name</label>
               <input
                 type="text"
                 name="name"
@@ -123,9 +120,7 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone Number
-              </label>
+              <label className="label">Phone Number</label>
               <input
                 type="tel"
                 name="phone"
@@ -135,15 +130,13 @@ export default function RegisterPage() {
                 className="input"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-[10px] text-gray-500 mt-1">
                 Use format: +254XXXXXXXXX (10 digits after +254)
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
+              <label className="label">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -157,21 +150,15 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition"
                 >
-                  {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400" />
-                  )}
+                  {showPassword ? "🙈" : "👁️"}
                 </button>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm Password
-              </label>
+              <label className="label">Confirm Password</label>
               <div className="relative">
                 <input
                   type={showConfirmPassword ? "text" : "password"}
@@ -185,13 +172,9 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition"
                 >
-                  {showConfirmPassword ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400" />
-                  )}
+                  {showConfirmPassword ? "🙈" : "👁️"}
                 </button>
               </div>
             </div>
@@ -199,7 +182,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={sendCodeMutation.isPending}
-              className="w-full btn-primary disabled:opacity-50"
+              className="w-full btn-primary"
             >
               {sendCodeMutation.isPending
                 ? "Sending code..."
@@ -208,16 +191,15 @@ export default function RegisterPage() {
           </form>
         ) : (
           <form onSubmit={handleVerify} className="space-y-4">
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600">
-                We sent a code to <strong>{formData.phone}</strong>
+            <div className="bg-black/50 border border-white/10 rounded-xl p-3 text-center">
+              <p className="text-sm text-gray-400">
+                We sent a code to{" "}
+                <span className="text-white">{formData.phone}</span>
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Verification Code
-              </label>
+              <label className="label">Verification Code</label>
               <input
                 type="text"
                 name="code"
@@ -234,7 +216,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={registerMutation.isPending}
-              className="w-full btn-primary disabled:opacity-50"
+              className="w-full btn-primary"
             >
               {registerMutation.isPending
                 ? "Verifying..."
@@ -244,16 +226,19 @@ export default function RegisterPage() {
             <button
               type="button"
               onClick={() => setStep(1)}
-              className="w-full text-sm text-gray-500 hover:text-gray-700"
+              className="w-full text-sm text-gray-400 hover:text-white transition"
             >
               ← Back to edit information
             </button>
           </form>
         )}
 
-        <p className="text-center text-sm text-gray-600 mt-6">
+        <p className="text-center text-sm text-gray-400 mt-6">
           Already have an account?{" "}
-          <Link to="/login" className="text-primary-600 hover:underline">
+          <Link
+            to="/login"
+            className="text-blue-400 hover:text-blue-300 transition"
+          >
             Login here
           </Link>
         </p>

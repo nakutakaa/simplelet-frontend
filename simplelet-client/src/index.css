@@ -1,31 +1,120 @@
+/* src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  * {
+    @apply border-white/10;
+  }
+
   body {
-    @apply bg-gray-50 text-gray-900 font-sans;
+    @apply bg-black text-white font-sans antialiased;
+    background: #000000;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #0a0a0a;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #3b82f6;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2563eb;
+  }
+
+  /* Input number arrows dark */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    opacity: 0.5;
   }
 }
 
 @layer components {
+  /* Buttons */
   .btn-primary {
-    @apply bg-primary-500 hover:bg-primary-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-2.5 px-5 rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 text-sm sm:text-base;
   }
 
   .btn-secondary {
-    @apply bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium py-2.5 px-5 rounded-xl transition-all duration-300 shadow-lg shadow-red-500/20 hover:shadow-red-500/30 text-sm sm:text-base;
   }
 
   .btn-outline {
-    @apply border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply border border-white/20 hover:bg-white/5 text-white font-medium py-2 px-5 rounded-xl transition-all duration-300 text-sm sm:text-base;
   }
 
-  .input {
-    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
-  }
-
+  /* Cards - FULL BLACK with thin border */
   .card {
-    @apply bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300;
+    @apply bg-black rounded-2xl overflow-hidden hover:bg-[#0a0a0a] transition-all duration-300 border border-white/10 hover:border-blue-500/30 shadow-xl;
+  }
+
+  /* Dark Cards */
+  .card-dark {
+    @apply bg-[#0a0a0a] rounded-2xl border border-white/10 p-4 sm:p-6;
+  }
+
+  /* Inputs - FULL BLACK */
+  .input {
+    @apply w-full px-4 py-2.5 bg-black border border-white/15 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-white placeholder-gray-500 transition-all duration-300 text-sm sm:text-base;
+  }
+
+  .input-dark {
+    @apply w-full px-4 py-2.5 bg-[#0a0a0a] border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-white placeholder-gray-500 transition-all duration-300 text-sm sm:text-base;
+  }
+
+  /* Select dark */
+  select.input {
+    @apply appearance-none bg-black;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23666' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+  }
+
+  /* Headings */
+  .heading-gradient {
+    @apply bg-gradient-to-r from-blue-400 via-white to-red-400 bg-clip-text text-transparent;
+  }
+
+  /* Badges */
+  .badge-blue {
+    @apply bg-blue-500/20 text-blue-400 px-2.5 py-1 rounded-full text-xs font-medium border border-blue-500/20;
+  }
+
+  .badge-red {
+    @apply bg-red-500/20 text-red-400 px-2.5 py-1 rounded-full text-xs font-medium border border-red-500/20;
+  }
+
+  .badge-gray {
+    @apply bg-white/10 text-gray-400 px-2.5 py-1 rounded-full text-xs font-medium border border-white/10;
+  }
+
+  /* Labels */
+  .label {
+    @apply block text-xs text-gray-400 mb-1.5 font-medium;
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .card {
+    @apply rounded-xl;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-outline {
+    @apply py-2 px-4 text-sm rounded-lg;
   }
 }
