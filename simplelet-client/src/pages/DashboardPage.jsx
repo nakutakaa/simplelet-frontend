@@ -73,7 +73,7 @@ export default function DashboardPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
       </div>
     );
   }
@@ -81,7 +81,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-500">Failed to load your listings</p>
+        <p className="text-red-400">Failed to load your listings</p>
       </div>
     );
   }
@@ -91,28 +91,30 @@ export default function DashboardPage() {
   return (
     <div className="max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">My Listings</h1>
-        <Link to="/create-listing" className="btn-primary">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h1 className="text-2xl font-bold text-white heading-gradient">
+          My Listings
+        </h1>
+        <Link to="/create-listing" className="btn-primary text-sm sm:text-base">
           + Post New Listing
         </Link>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-gray-500 text-sm">Total Listings</p>
-          <p className="text-2xl font-bold">{listings.length}</p>
+        <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-4 shadow-xl">
+          <p className="text-gray-400 text-sm">Total Listings</p>
+          <p className="text-2xl font-bold text-white">{listings.length}</p>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-gray-500 text-sm">Active Listings</p>
-          <p className="text-2xl font-bold text-green-600">
+        <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-4 shadow-xl">
+          <p className="text-gray-400 text-sm">Active Listings</p>
+          <p className="text-2xl font-bold text-green-400">
             {listings.filter((l) => !l.is_taken && l.is_active).length}
           </p>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-gray-500 text-sm">Taken</p>
-          <p className="text-2xl font-bold text-orange-600">
+        <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-4 shadow-xl">
+          <p className="text-gray-400 text-sm">Taken</p>
+          <p className="text-2xl font-bold text-orange-400">
             {listings.filter((l) => l.is_taken && l.is_active).length}
           </p>
         </div>
@@ -120,8 +122,21 @@ export default function DashboardPage() {
 
       {/* Listings Grid */}
       {listings.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg">
-          <p className="text-gray-500 mb-4">
+        <div className="text-center py-12 sm:py-16 bg-[#0a0a0a] rounded-2xl border border-white/10">
+          <svg
+            className="w-16 h-16 text-gray-600 mx-auto mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+            />
+          </svg>
+          <p className="text-gray-400 mb-4">
             You haven't posted any listings yet
           </p>
           <Link to="/create-listing" className="btn-primary">
@@ -133,10 +148,10 @@ export default function DashboardPage() {
           {listings.map((listing) => (
             <div
               key={listing.id}
-              className="bg-white rounded-lg shadow overflow-hidden"
+              className="bg-[#0a0a0a] rounded-2xl border border-white/10 overflow-hidden shadow-xl hover:border-blue-500/30 transition-all duration-300"
             >
               {/* Image */}
-              <div className="h-48 bg-gray-200 relative">
+              <div className="h-48 bg-[#0a0a0a] relative">
                 {listing.images && listing.images[0] ? (
                   <img
                     src={listing.images[0].thumbnail}
@@ -146,7 +161,7 @@ export default function DashboardPage() {
                 ) : (
                   <div className="w-full h-48 flex items-center justify-center">
                     <svg
-                      className="w-12 h-12 text-gray-400"
+                      className="w-16 h-16 text-gray-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -154,14 +169,14 @@ export default function DashboardPage() {
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        strokeWidth={2}
+                        strokeWidth={1.5}
                         d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                       />
                     </svg>
                   </div>
                 )}
                 {listing.is_taken && (
-                  <span className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
+                  <span className="absolute top-3 right-3 badge-red">
                     Taken
                   </span>
                 )}
@@ -169,27 +184,50 @@ export default function DashboardPage() {
 
               {/* Content */}
               <div className="p-4">
-                <h3 className="font-semibold text-lg mb-1">{listing.title}</h3>
-                <p className="text-gray-500 text-sm mb-2">{listing.location}</p>
-                <p className="text-primary-600 font-bold text-xl mb-3">
+                <h3 className="font-semibold text-lg mb-1 text-white truncate">
+                  {listing.title}
+                </h3>
+                <p className="text-gray-400 text-sm mb-2 flex items-center gap-1">
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                  {listing.location}
+                </p>
+                <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-xl mb-3">
                   KSh {listing.price?.toLocaleString()}
                 </p>
 
                 {/* Actions */}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Link
                     to={`/edit-listing/${listing.id}`}
-                    className="flex-1 text-center bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg transition"
+                    className="flex-1 text-center bg-white/5 hover:bg-white/10 text-gray-300 py-2 rounded-xl border border-white/10 hover:border-blue-500/30 transition-all duration-300 text-sm"
                   >
                     Edit
                   </Link>
                   <button
                     onClick={() => handleToggleTaken(listing.id)}
                     disabled={togglingId === listing.id}
-                    className={`flex-1 py-2 rounded-lg transition ${
+                    className={`flex-1 py-2 rounded-xl transition-all duration-300 text-sm ${
                       listing.is_taken
-                        ? "bg-green-100 hover:bg-green-200 text-green-700"
-                        : "bg-yellow-100 hover:bg-yellow-200 text-yellow-700"
+                        ? "bg-green-500/20 text-green-400 border border-green-500/20 hover:bg-green-500/30"
+                        : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/30"
                     }`}
                   >
                     {togglingId === listing.id
@@ -201,7 +239,7 @@ export default function DashboardPage() {
                   <button
                     onClick={() => handleDelete(listing.id)}
                     disabled={deletingId === listing.id}
-                    className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 py-2 rounded-lg transition"
+                    className="flex-1 bg-red-500/20 text-red-400 border border-red-500/20 hover:bg-red-500/30 py-2 rounded-xl transition-all duration-300 text-sm"
                   >
                     {deletingId === listing.id ? "..." : "Delete"}
                   </button>

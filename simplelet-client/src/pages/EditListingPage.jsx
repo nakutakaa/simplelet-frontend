@@ -196,7 +196,7 @@ export default function EditListingPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
       </div>
     );
   }
@@ -204,7 +204,13 @@ export default function EditListingPage() {
   if (error || !listing) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-500">Listing not found</p>
+        <p className="text-red-400">Listing not found</p>
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="btn-primary mt-4"
+        >
+          Back to Dashboard
+        </button>
       </div>
     );
   }
@@ -214,15 +220,15 @@ export default function EditListingPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h1 className="text-2xl font-bold mb-6">Edit Listing</h1>
+      <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
+        <h1 className="text-2xl font-bold text-white mb-6 heading-gradient">
+          Edit Listing
+        </h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* House Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Property Type *
-            </label>
+            <label className="label">Property Type *</label>
             <select
               name="house_type"
               value={formData.house_type}
@@ -240,9 +246,7 @@ export default function EditListingPage() {
 
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Title (Optional)
-            </label>
+            <label className="label">Title (Optional)</label>
             <input
               type="text"
               name="title"
@@ -255,9 +259,7 @@ export default function EditListingPage() {
 
           {/* Location */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Location *
-            </label>
+            <label className="label">Location *</label>
             <input
               type="text"
               name="location"
@@ -271,9 +273,7 @@ export default function EditListingPage() {
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
+            <label className="label">Description</label>
             <textarea
               name="description"
               value={formData.description}
@@ -286,9 +286,7 @@ export default function EditListingPage() {
 
           {/* Price */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Price (KSh per month)
-            </label>
+            <label className="label">Price (KSh per month)</label>
             <input
               type="number"
               name="price"
@@ -301,9 +299,7 @@ export default function EditListingPage() {
 
           {/* Contact Phone */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contact Phone (Optional)
-            </label>
+            <label className="label">Contact Phone (Optional)</label>
             <input
               type="tel"
               name="contact_phone"
@@ -317,7 +313,7 @@ export default function EditListingPage() {
           {/* Existing Images */}
           {existingImages.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="label">
                 Current Images ({existingImages.length})
               </label>
               <div className="grid grid-cols-4 gap-3">
@@ -326,7 +322,7 @@ export default function EditListingPage() {
                     <img
                       src={image.thumbnail}
                       alt="Listing"
-                      className="w-full h-24 object-cover rounded-lg"
+                      className="w-full h-24 object-cover rounded-lg border border-white/10"
                     />
                     <button
                       type="button"
@@ -343,25 +339,26 @@ export default function EditListingPage() {
 
           {/* New Images Upload */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Add More Images ({totalImages}/10)
-            </label>
+            <label className="label">Add More Images ({totalImages}/10)</label>
 
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition
-                ${isDragActive ? "border-primary-500 bg-primary-50" : "border-gray-300 hover:border-primary-400"}`}
+              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition ${
+                isDragActive
+                  ? "border-blue-500 bg-blue-500/10"
+                  : "border-white/15 hover:border-blue-500/50 bg-black/30"
+              }`}
             >
               <input {...getInputProps()} />
-              <PhotoIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+              <PhotoIcon className="w-12 h-12 text-gray-500 mx-auto mb-2" />
               {isDragActive ? (
-                <p className="text-primary-600">Drop the images here...</p>
+                <p className="text-blue-400">Drop the images here...</p>
               ) : (
-                <p className="text-gray-500">
+                <p className="text-gray-400">
                   Drag & drop new images here, or click to select
                 </p>
               )}
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-[10px] text-gray-500 mt-2">
                 Max 10 images total, up to 10MB each
               </p>
             </div>
@@ -374,7 +371,7 @@ export default function EditListingPage() {
                     <img
                       src={preview.url}
                       alt={preview.name}
-                      className="w-full h-24 object-cover rounded-lg"
+                      className="w-full h-24 object-cover rounded-lg border border-white/10"
                     />
                     <button
                       type="button"
@@ -390,7 +387,7 @@ export default function EditListingPage() {
           </div>
 
           {/* Submit Buttons */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-4 border-t border-white/10">
             <button
               type="button"
               onClick={() => navigate("/dashboard")}

@@ -41,7 +41,6 @@ const uploadImages = async ({ listingId, images }) => {
 export default function CreateListingPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [step, setStep] = useState(1);
   const [listingId, setListingId] = useState(null);
   const [formData, setFormData] = useState({
     title: "",
@@ -94,7 +93,7 @@ export default function CreateListingPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Handle form submission (step 1)
+  // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -126,7 +125,6 @@ export default function CreateListingPage() {
         return;
       }
 
-      // Validate file sizes and types
       const validFiles = [];
       const invalidFiles = [];
 
@@ -147,7 +145,6 @@ export default function CreateListingPage() {
       if (validFiles.length > 0) {
         setImages([...images, ...validFiles]);
 
-        // Create preview URLs
         const newPreviews = validFiles.map((file) => ({
           url: URL.createObjectURL(file),
           name: file.name,
@@ -164,9 +161,7 @@ export default function CreateListingPage() {
     maxSize: 10 * 1024 * 1024,
   });
 
-  // Remove image
   const removeImage = (index) => {
-    // Revoke object URL to avoid memory leaks
     URL.revokeObjectURL(imagePreviews[index].url);
 
     const newImages = [...images];
@@ -182,15 +177,15 @@ export default function CreateListingPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h1 className="text-2xl font-bold mb-6">Post a New Listing</h1>
+      <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
+        <h1 className="text-2xl font-bold text-white mb-6 heading-gradient">
+          Post a New Listing
+        </h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* House Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Property Type *
-            </label>
+            <label className="label">Property Type *</label>
             <select
               name="house_type"
               value={formData.house_type}
@@ -208,9 +203,7 @@ export default function CreateListingPage() {
 
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Title (Optional)
-            </label>
+            <label className="label">Title (Optional)</label>
             <input
               type="text"
               name="title"
@@ -219,16 +212,14 @@ export default function CreateListingPage() {
               placeholder="e.g., Spacious 2BR with Great View"
               className="input"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-[10px] text-gray-500 mt-1">
               Leave blank to auto-generate from property type and location
             </p>
           </div>
 
           {/* Location */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Location *
-            </label>
+            <label className="label">Location *</label>
             <input
               type="text"
               name="location"
@@ -242,9 +233,7 @@ export default function CreateListingPage() {
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
+            <label className="label">Description</label>
             <textarea
               name="description"
               value={formData.description}
@@ -257,9 +246,7 @@ export default function CreateListingPage() {
 
           {/* Price */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Price (KSh per month)
-            </label>
+            <label className="label">Price (KSh per month)</label>
             <input
               type="number"
               name="price"
@@ -268,16 +255,14 @@ export default function CreateListingPage() {
               placeholder="e.g., 25000"
               className="input"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-[10px] text-gray-500 mt-1">
               Leave blank if price is negotiable
             </p>
           </div>
 
           {/* Contact Phone (Optional) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contact Phone (Optional)
-            </label>
+            <label className="label">Contact Phone (Optional)</label>
             <input
               type="tel"
               name="contact_phone"
@@ -290,25 +275,26 @@ export default function CreateListingPage() {
 
           {/* Image Upload */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Upload Images (Max 10)
-            </label>
+            <label className="label">Upload Images (Max 10)</label>
 
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition
-                ${isDragActive ? "border-primary-500 bg-primary-50" : "border-gray-300 hover:border-primary-400"}`}
+              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition ${
+                isDragActive
+                  ? "border-blue-500 bg-blue-500/10"
+                  : "border-white/15 hover:border-blue-500/50 bg-black/30"
+              }`}
             >
               <input {...getInputProps()} />
-              <PhotoIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+              <PhotoIcon className="w-12 h-12 text-gray-500 mx-auto mb-2" />
               {isDragActive ? (
-                <p className="text-primary-600">Drop the images here...</p>
+                <p className="text-blue-400">Drop the images here...</p>
               ) : (
-                <p className="text-gray-500">
+                <p className="text-gray-400">
                   Drag & drop images here, or click to select
                 </p>
               )}
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-[10px] text-gray-500 mt-2">
                 Max 10 images, up to 10MB each (JPG, PNG, GIF, WebP)
               </p>
             </div>
@@ -321,7 +307,7 @@ export default function CreateListingPage() {
                     <img
                       src={preview.url}
                       alt={preview.name}
-                      className="w-full h-24 object-cover rounded-lg"
+                      className="w-full h-24 object-cover rounded-lg border border-white/10"
                     />
                     <button
                       type="button"
@@ -335,13 +321,13 @@ export default function CreateListingPage() {
               </div>
             )}
 
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-[10px] text-gray-500 mt-2">
               {images.length} / 10 images selected
             </p>
           </div>
 
           {/* Submit Button */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-4 border-t border-white/10">
             <button
               type="button"
               onClick={() => navigate("/dashboard")}

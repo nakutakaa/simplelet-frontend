@@ -31,6 +31,10 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [formData, setFormData] = useState({ name: "", phone: "" });
   const [passwordData, setPasswordData] = useState({
     current_password: "",
@@ -143,7 +147,7 @@ export default function ProfilePage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
       </div>
     );
   }
@@ -151,7 +155,7 @@ export default function ProfilePage() {
   if (error || !user) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-500">Failed to load profile</p>
+        <p className="text-red-400">Failed to load profile</p>
         <button onClick={() => navigate("/")} className="btn-primary mt-4">
           Back to Home
         </button>
@@ -161,8 +165,10 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h1 className="text-2xl font-bold mb-6">My Profile</h1>
+      <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
+        <h1 className="text-2xl font-bold text-white mb-6 heading-gradient">
+          My Profile
+        </h1>
 
         {/* Profile Info */}
         <div className="space-y-4">
@@ -170,30 +176,30 @@ export default function ProfilePage() {
             <>
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm text-gray-500">Name</p>
-                  <p className="text-lg font-medium">{user.name}</p>
+                  <p className="text-gray-400 text-sm">Name</p>
+                  <p className="text-lg font-medium text-white">{user.name}</p>
                 </div>
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="text-sm text-primary-600 hover:underline"
+                  className="text-sm text-blue-400 hover:text-blue-300 transition"
                 >
                   Edit
                 </button>
               </div>
 
               <div>
-                <p className="text-sm text-gray-500">Phone</p>
-                <p className="text-lg font-medium">{user.phone}</p>
+                <p className="text-gray-400 text-sm">Phone</p>
+                <p className="text-lg font-medium text-white">{user.phone}</p>
                 {user.is_verified ? (
-                  <span className="text-xs text-green-600">✓ Verified</span>
+                  <span className="text-xs text-green-400">✓ Verified</span>
                 ) : (
-                  <span className="text-xs text-yellow-600">Not verified</span>
+                  <span className="text-xs text-yellow-400">Not verified</span>
                 )}
               </div>
 
               <div>
-                <p className="text-sm text-gray-500">Member Since</p>
-                <p className="text-lg font-medium">
+                <p className="text-gray-400 text-sm">Member Since</p>
+                <p className="text-lg font-medium text-white">
                   {new Date(user.created_at).toLocaleDateString()}
                 </p>
               </div>
@@ -201,9 +207,7 @@ export default function ProfilePage() {
           ) : (
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Name
-                </label>
+                <label className="label">Name</label>
                 <input
                   type="text"
                   value={formData.name}
@@ -215,16 +219,14 @@ export default function ProfilePage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone (Cannot be changed here)
-                </label>
+                <label className="label">Phone (Cannot be changed here)</label>
                 <input
                   type="text"
                   value={formData.phone}
-                  className="input bg-gray-100 cursor-not-allowed"
+                  className="input bg-black/50 cursor-not-allowed border-white/5"
                   disabled
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-[10px] text-gray-500 mt-1">
                   Contact support to change phone number
                 </p>
               </div>
@@ -255,10 +257,10 @@ export default function ProfilePage() {
         </div>
 
         {/* Change Password Section */}
-        <div className="border-t border-gray-200 mt-6 pt-6">
+        <div className="border-t border-white/10 mt-6 pt-6">
           <button
             onClick={() => setIsChangingPassword(!isChangingPassword)}
-            className="text-primary-600 hover:underline text-sm"
+            className="text-blue-400 hover:text-blue-300 transition text-sm"
           >
             {isChangingPassword ? "Cancel" : "Change Password"}
           </button>
@@ -266,58 +268,79 @@ export default function ProfilePage() {
           {isChangingPassword && (
             <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Current Password
-                </label>
-                <input
-                  type="password"
-                  value={passwordData.current_password}
-                  onChange={(e) =>
-                    setPasswordData({
-                      ...passwordData,
-                      current_password: e.target.value,
-                    })
-                  }
-                  className="input"
-                  required
-                />
+                <label className="label">Current Password</label>
+                <div className="relative">
+                  <input
+                    type={showCurrentPassword ? "text" : "password"}
+                    value={passwordData.current_password}
+                    onChange={(e) =>
+                      setPasswordData({
+                        ...passwordData,
+                        current_password: e.target.value,
+                      })
+                    }
+                    className="input pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition"
+                  >
+                    {showCurrentPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  New Password
-                </label>
-                <input
-                  type="password"
-                  value={passwordData.new_password}
-                  onChange={(e) =>
-                    setPasswordData({
-                      ...passwordData,
-                      new_password: e.target.value,
-                    })
-                  }
-                  className="input"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">
+                <label className="label">New Password</label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={passwordData.new_password}
+                    onChange={(e) =>
+                      setPasswordData({
+                        ...passwordData,
+                        new_password: e.target.value,
+                      })
+                    }
+                    className="input pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition"
+                  >
+                    {showNewPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1">
                   Minimum 6 characters
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Confirm New Password
-                </label>
-                <input
-                  type="password"
-                  value={passwordData.confirm_password}
-                  onChange={(e) =>
-                    setPasswordData({
-                      ...passwordData,
-                      confirm_password: e.target.value,
-                    })
-                  }
-                  className="input"
-                  required
-                />
+                <label className="label">Confirm New Password</label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={passwordData.confirm_password}
+                    onChange={(e) =>
+                      setPasswordData({
+                        ...passwordData,
+                        confirm_password: e.target.value,
+                      })
+                    }
+                    className="input pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition"
+                  >
+                    {showConfirmPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
               </div>
               <button
                 type="submit"
@@ -331,10 +354,10 @@ export default function ProfilePage() {
         </div>
 
         {/* Delete Account Section */}
-        <div className="border-t border-gray-200 mt-6 pt-6">
+        <div className="border-t border-white/10 mt-6 pt-6">
           <button
             onClick={() => setIsDeleting(!isDeleting)}
-            className="text-red-600 hover:underline text-sm"
+            className="text-red-400 hover:text-red-300 transition text-sm"
           >
             {isDeleting ? "Cancel" : "Delete Account"}
           </button>
@@ -342,27 +365,34 @@ export default function ProfilePage() {
           {isDeleting && (
             <form
               onSubmit={handleDeleteSubmit}
-              className="mt-4 space-y-4 p-4 bg-red-50 rounded-lg"
+              className="mt-4 space-y-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl"
             >
-              <p className="text-sm text-red-700 font-medium">
+              <p className="text-sm text-red-400 font-medium">
                 ⚠️ Warning: This will permanently delete your account, all
                 listings, and comments.
               </p>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Enter your password to confirm
-                </label>
-                <input
-                  type="password"
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  className="input"
-                  required
-                />
+                <label className="label">Enter your password to confirm</label>
+                <div className="relative">
+                  <input
+                    type={showDeletePassword ? "text" : "password"}
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    className="input pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeletePassword(!showDeletePassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition"
+                  >
+                    {showDeletePassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
               </div>
               <button
                 type="submit"
-                className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg"
+                className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium py-2 px-4 rounded-xl transition-all duration-300 shadow-lg shadow-red-500/20 hover:shadow-red-500/30"
                 disabled={deleteMutation.isPending}
               >
                 {deleteMutation.isPending

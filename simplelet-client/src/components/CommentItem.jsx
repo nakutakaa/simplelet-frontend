@@ -108,37 +108,37 @@ export default function CommentItem({
   const remainingReplies = comment.replies_count - allReplies.length;
 
   return (
-    <div
-      className={`${depth > 0 ? "ml-6 border-l-2 border-gray-200 pl-4" : ""}`}
-    >
+    <div className={`${depth > 0 ? "ml-6 border-l border-white/10 pl-4" : ""}`}>
       {/* Comment content */}
-      <div className="bg-gray-50 rounded-lg p-4 mb-3">
+      <div className="bg-[#0a0a0a] rounded-xl border border-white/10 p-4 mb-3">
         <div className="flex items-start justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm">{comment.author_name}</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm text-white">
+              {comment.author_name}
+            </span>
             <span className="text-xs text-gray-400">
               {new Date(comment.created_at).toLocaleDateString()}
             </span>
             {depth > 0 && (
-              <span className="text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded">
+              <span className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
                 Level {depth}
               </span>
             )}
           </div>
           {comment.is_anonymous && (
-            <span className="text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded">
+            <span className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
               Anonymous
             </span>
           )}
         </div>
 
-        <p className="text-gray-700 text-sm mb-2">{comment.content}</p>
+        <p className="text-gray-300 text-sm mb-2">{comment.content}</p>
 
         <div className="flex items-center gap-3">
           {canReply && (
             <button
               onClick={() => setShowReplyForm(!showReplyForm)}
-              className="text-xs text-primary-600 hover:underline"
+              className="text-xs text-blue-400 hover:text-blue-300 transition"
             >
               {showReplyForm ? "Cancel" : "Reply"}
             </button>
@@ -146,7 +146,7 @@ export default function CommentItem({
           {comment.replies_count > 0 && (
             <button
               onClick={() => setShowReplies(!showReplies)}
-              className="text-xs text-gray-500 hover:underline"
+              className="text-xs text-gray-400 hover:text-gray-300 transition"
             >
               {showReplies ? "Hide" : "Show"} replies ({comment.replies_count})
             </button>
@@ -177,30 +177,30 @@ export default function CommentItem({
 
           {/* Anonymous options */}
           <div className="flex items-center gap-4">
-            <label className="flex items-center gap-1 text-xs text-gray-500">
+            <label className="flex items-center gap-1 text-xs text-gray-400 cursor-pointer">
               <input
                 type="checkbox"
                 checked={isAnonymous}
                 onChange={(e) => setIsAnonymous(e.target.checked)}
-                className="rounded"
+                className="rounded border-white/20 bg-black text-blue-500 focus:ring-blue-500"
               />
               Comment as Guest
             </label>
             {isAnonymous && (
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <input
                   type="text"
                   value={guestName}
                   onChange={(e) => setGuestName(e.target.value)}
                   placeholder="Your name (optional)"
-                  className="input text-sm py-1"
+                  className="input text-sm py-1 w-32"
                 />
                 <input
                   type="tel"
                   value={guestPhone}
                   onChange={(e) => setGuestPhone(e.target.value)}
                   placeholder="Phone (optional)"
-                  className="input text-sm py-1"
+                  className="input text-sm py-1 w-32"
                 />
               </div>
             )}
@@ -227,7 +227,7 @@ export default function CommentItem({
       {showReplies && remainingReplies > 0 && (
         <button
           onClick={handleLoadMoreReplies}
-          className="text-xs text-primary-600 hover:underline ml-6 mt-1"
+          className="text-xs text-blue-400 hover:text-blue-300 transition ml-6 mt-1"
           disabled={repliesPage >= Math.ceil(comment.replies_count / 10)}
         >
           Load more replies ({remainingReplies} remaining)
