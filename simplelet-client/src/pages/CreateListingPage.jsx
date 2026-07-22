@@ -19,7 +19,7 @@ const HOUSE_TYPES = [
   { value: "commercial", label: "Commercial Space" },
 ];
 
-// ============ NEW: Layer 1 Dropdown Options ============
+// ============ Layer 1 Dropdown Options ============
 const WATER_SOURCES = [
   { value: "nairobi_water", label: "Nairobi Water" },
   { value: "borehole", label: "Borehole" },
@@ -74,12 +74,19 @@ const uploadImages = async ({ listingId, images }) => {
   return data;
 };
 
+// Delete listing (rollback)
+const deleteListing = async (listingId) => {
+  const { data } = await API.delete(`/listings/${listingId}`);
+  return data;
+};
+
 export default function CreateListingPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const cameraInputRef = useRef(null);
 
   const [listingId, setListingId] = useState(null);
+  const [isRollingBack, setIsRollingBack] = useState(false);
   const [formData, setFormData] = useState({
     // Existing fields
     title: "",
@@ -90,25 +97,20 @@ export default function CreateListingPage() {
     contact_phone: "",
     latitude: "",
     longitude: "",
-    // ============ NEW: Layer 1 Fields ============
-    // Utility & Fee Breakdown
+    // ============ Layer 1 Fields ============
     service_charge: "",
     trash_fee: "",
-    // Water Matrix
     water_source: "",
     water_metering: "",
     water_rationing: "",
-    // Power Matrix
     power_metering: "",
     backup_power: "",
-    // Building Features (checkboxes)
     has_lift: false,
     has_cctv: false,
     has_balcony: false,
     has_rooftop: false,
     has_parking: false,
     has_fence: false,
-    // Commute & Logistics
     matatu_distance: "",
     matatu_walk_time: "",
     fare_cbd_offpeak: "",
@@ -123,7 +125,22 @@ export default function CreateListingPage() {
   const [locationStatus, setLocationStatus] = useState(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
 
-  // Create listing mutation
+  // ============ DELETE LISTING (ROLLBACK) ============
+  const deleteMutation = useMutation({
+    mutationFn: deleteListing,
+    onSuccess: () => {
+      setIsRollingBack(false);
+      toast.error("❌ Listing creation failed. Please try again.");
+    },
+    onError: () => {
+      setIsRollingBack(false);
+      toast.error(
+        "⚠️ Images failed to upload and we couldn't rollback the listing. Please contact support.",
+      );
+    },
+  });
+
+  // ============ CREATE LISTING ============
   const createMutation = useMutation({
     mutationFn: createListing,
     onSuccess: (data) => {
@@ -141,10 +158,34 @@ export default function CreateListingPage() {
     },
   });
 
-  // Upload images mutation
+  // ============ UPLOAD IMAGES ============
   const uploadMutation = useMutation({
     mutationFn: uploadImages,
     onSuccess: (data) => {
+      // Check if any images were rejected
+      const rejectedCount = data.rejected_files?.length || 0;
+      const uploadedCount = data.uploaded?.length || 0;
+
+      if (rejectedCount > 0 && uploadedCount === 0) {
+        // ALL images rejected - rollback listing
+        toast.error("❌ All images were rejected. Rolling back listing...");
+        setIsRollingBack(true);
+        deleteMutation.mutate(listingId);
+        return;
+      }
+
+      if (rejectedCount > 0 && uploadedCount > 0) {
+        // Some images rejected, some uploaded - show warning but keep listing
+        toast.warning(
+          `⚠️ ${rejectedCount} image(s) were rejected. ${uploadedCount} uploaded successfully.`,
+        );
+        // Show detailed rejection reasons
+        data.rejected_files.forEach((rejected) => {
+          toast.error(`❌ ${rejected.filename}: ${rejected.reason}`);
+        });
+      }
+
+      // Show location status
       if (data.location_warnings && data.location_warnings.length > 0) {
         const warning = data.location_warnings[0];
         toast.warning(`⚠️ ${warning.warning}`);
@@ -152,16 +193,17 @@ export default function CreateListingPage() {
       if (data.location_verified) {
         toast.success("📍 Location verified!");
       }
-      toast.success("Listing created with images!");
+
+      toast.success(`✅ Listing created with ${uploadedCount} images!`);
       queryClient.invalidateQueries(["myListings"]);
       navigate("/dashboard");
     },
     onError: (error) => {
-      toast.error(
-        error.response?.data?.error ||
-          "Images upload failed, but listing was created",
-      );
-      navigate("/dashboard");
+      // Images failed to upload - rollback listing
+      const errorMsg = error.response?.data?.error || "Images upload failed";
+      toast.error(`❌ ${errorMsg}. Rolling back listing...`);
+      setIsRollingBack(true);
+      deleteMutation.mutate(listingId);
     },
   });
 
@@ -193,7 +235,7 @@ export default function CreateListingPage() {
       return;
     }
 
-    // Clean up form data - convert empty strings to null
+    // Clean up form data
     const cleanedData = {};
     for (const [key, value] of Object.entries(formData)) {
       if (value === "" || value === null || value === undefined) {
@@ -250,11 +292,35 @@ export default function CreateListingPage() {
       return;
     }
 
+    // GPS with fallback
     setIsGettingLocation(true);
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
+      const locationPromise = new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              success: true,
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+          },
+          (error) => {
+            console.warn("⚠️ GPS error:", error.message);
+            resolve({ success: false, error: error.message });
+          },
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 },
+        );
+      });
+
+      const timeoutPromise = new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({ success: false, error: "GPS timeout" });
+        }, 6000);
+      });
+
+      Promise.race([locationPromise, timeoutPromise]).then((result) => {
+        if (result.success) {
+          const { latitude, longitude } = result;
           console.log("📍 GPS detected:", latitude, longitude);
           setFormData((prev) => ({
             ...prev,
@@ -266,22 +332,21 @@ export default function CreateListingPage() {
             message: `📍 Location detected: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
           });
           toast.success("📍 Location detected!");
-          setIsGettingLocation(false);
-        },
-        (error) => {
-          console.error("❌ Geolocation error:", error);
+        } else {
+          console.warn("⚠️ Could not get GPS:", result.error);
           setLocationStatus({
             success: false,
             message:
-              "⚠️ Could not get GPS location. Please enable location services.",
+              "⚠️ Could not get GPS location. Location verification may be skipped.",
           });
-          toast.error("Could not get GPS location. Enable location services.");
-          setIsGettingLocation(false);
-        },
-        { enableHighAccuracy: true, timeout: 10000 },
-      );
+          toast.warning("⚠️ GPS not available. Location verification skipped.");
+        }
+        setIsGettingLocation(false);
+      });
     } else {
-      toast.error("Geolocation not supported");
+      toast.warning(
+        "📍 Geolocation not supported. Location verification skipped.",
+      );
       setIsGettingLocation(false);
     }
 
@@ -293,10 +358,7 @@ export default function CreateListingPage() {
     };
     setImagePreviews((prev) => [...prev, preview]);
 
-    toast.success(
-      "📸 Photo captured! Image will be watermarked and location verified.",
-    );
-
+    toast.success("📸 Photo captured!");
     e.target.value = "";
   };
 
@@ -322,7 +384,8 @@ export default function CreateListingPage() {
     }
   };
 
-  const isSubmitting = createMutation.isPending || uploadMutation.isPending;
+  const isSubmitting =
+    createMutation.isPending || uploadMutation.isPending || isRollingBack;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -839,7 +902,9 @@ export default function CreateListingPage() {
               className="flex-1 btn-primary disabled:opacity-50"
             >
               {isSubmitting
-                ? "Creating..."
+                ? isRollingBack
+                  ? "Rolling back..."
+                  : "Creating..."
                 : `Post Listing (${images.length} photos)`}
             </button>
           </div>

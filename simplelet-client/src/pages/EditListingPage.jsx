@@ -19,7 +19,7 @@ const HOUSE_TYPES = [
   { value: "commercial", label: "Commercial Space" },
 ];
 
-// ============ NEW: Layer 1 Dropdown Options ============
+// ============ Layer 1 Dropdown Options ============
 const WATER_SOURCES = [
   { value: "nairobi_water", label: "Nairobi Water" },
   { value: "borehole", label: "Borehole" },
@@ -102,25 +102,20 @@ export default function EditListingPage() {
     contact_phone: "",
     latitude: "",
     longitude: "",
-    // ============ NEW: Layer 1 Fields ============
-    // Utility & Fee Breakdown
+    // ============ Layer 1 Fields ============
     service_charge: "",
     trash_fee: "",
-    // Water Matrix
     water_source: "",
     water_metering: "",
     water_rationing: "",
-    // Power Matrix
     power_metering: "",
     backup_power: "",
-    // Building Features (checkboxes)
     has_lift: false,
     has_cctv: false,
     has_balcony: false,
     has_rooftop: false,
     has_parking: false,
     has_fence: false,
-    // Commute & Logistics
     matatu_distance: "",
     matatu_walk_time: "",
     fare_cbd_offpeak: "",
@@ -136,6 +131,7 @@ export default function EditListingPage() {
   const [imagesToDelete, setImagesToDelete] = useState([]);
   const [locationStatus, setLocationStatus] = useState(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
 
   // Fetch existing listing data
   const {
@@ -151,7 +147,6 @@ export default function EditListingPage() {
   useEffect(() => {
     if (listing) {
       setFormData({
-        // Existing fields
         title: listing.title || "",
         house_type: listing.house_type || "studio",
         location: listing.location || "",
@@ -160,25 +155,19 @@ export default function EditListingPage() {
         contact_phone: listing.contact_phone || "",
         latitude: listing.latitude || "",
         longitude: listing.longitude || "",
-        // ============ NEW: Layer 1 Fields ============
-        // Utility & Fee Breakdown
         service_charge: listing.service_charge || "",
         trash_fee: listing.trash_fee || "",
-        // Water Matrix
         water_source: listing.water_source || "",
         water_metering: listing.water_metering || "",
         water_rationing: listing.water_rationing || "",
-        // Power Matrix
         power_metering: listing.power_metering || "",
         backup_power: listing.backup_power || "",
-        // Building Features
         has_lift: listing.has_lift || false,
         has_cctv: listing.has_cctv || false,
         has_balcony: listing.has_balcony || false,
         has_rooftop: listing.has_rooftop || false,
         has_parking: listing.has_parking || false,
         has_fence: listing.has_fence || false,
-        // Commute & Logistics
         matatu_distance: listing.matatu_distance || "",
         matatu_walk_time: listing.matatu_walk_time || "",
         fare_cbd_offpeak: listing.fare_cbd_offpeak || "",
@@ -202,14 +191,54 @@ export default function EditListingPage() {
 
       // Handle new image uploads
       if (newImages.length > 0) {
-        const result = await uploadImages({ listingId: id, images: newImages });
-        if (result.location_warnings && result.location_warnings.length > 0) {
-          const warning = result.location_warnings[0];
-          toast.warning(`⚠️ ${warning.warning}`);
+        setIsUploadingImages(true);
+        try {
+          const result = await uploadImages({
+            listingId: id,
+            images: newImages,
+          });
+
+          // Check if any images were rejected
+          const rejectedCount = result.rejected_files?.length || 0;
+          const uploadedCount = result.uploaded?.length || 0;
+
+          if (rejectedCount > 0 && uploadedCount === 0) {
+            // ALL images rejected
+            toast.error(
+              `❌ All ${rejectedCount} images were rejected. No new images added.`,
+            );
+            result.rejected_files.forEach((rejected) => {
+              toast.error(`❌ ${rejected.filename}: ${rejected.reason}`);
+            });
+            setIsUploadingImages(false);
+            queryClient.invalidateQueries(["myListings"]);
+            queryClient.invalidateQueries(["listing", id]);
+            navigate("/dashboard");
+            return;
+          }
+
+          if (rejectedCount > 0 && uploadedCount > 0) {
+            toast.warning(
+              `⚠️ ${rejectedCount} image(s) rejected. ${uploadedCount} uploaded successfully.`,
+            );
+            result.rejected_files.forEach((rejected) => {
+              toast.error(`❌ ${rejected.filename}: ${rejected.reason}`);
+            });
+          }
+
+          if (result.location_warnings && result.location_warnings.length > 0) {
+            const warning = result.location_warnings[0];
+            toast.warning(`⚠️ ${warning.warning}`);
+          }
+          if (result.location_verified) {
+            toast.success("📍 Location verified!");
+          }
+        } catch (error) {
+          toast.error("Failed to upload images. Please try again.");
+          setIsUploadingImages(false);
+          return;
         }
-        if (result.location_verified) {
-          toast.success("📍 Location verified!");
-        }
+        setIsUploadingImages(false);
       }
 
       toast.success("Listing updated successfully!");
@@ -240,7 +269,7 @@ export default function EditListingPage() {
       return;
     }
 
-    // Clean up form data - convert empty strings to null
+    // Clean up form data
     const cleanedData = {};
     for (const [key, value] of Object.entries(formData)) {
       if (value === "" || value === null || value === undefined) {
@@ -303,12 +332,35 @@ export default function EditListingPage() {
       return;
     }
 
-    // Get GPS from device
+    // GPS with fallback
     setIsGettingLocation(true);
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
+      const locationPromise = new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              success: true,
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+          },
+          (error) => {
+            console.warn("⚠️ GPS error:", error.message);
+            resolve({ success: false, error: error.message });
+          },
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 },
+        );
+      });
+
+      const timeoutPromise = new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({ success: false, error: "GPS timeout" });
+        }, 6000);
+      });
+
+      Promise.race([locationPromise, timeoutPromise]).then((result) => {
+        if (result.success) {
+          const { latitude, longitude } = result;
           console.log("📍 GPS detected:", latitude, longitude);
           setFormData((prev) => ({
             ...prev,
@@ -320,22 +372,21 @@ export default function EditListingPage() {
             message: `📍 Location detected: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
           });
           toast.success("📍 Location detected!");
-          setIsGettingLocation(false);
-        },
-        (error) => {
-          console.error("❌ Geolocation error:", error);
+        } else {
+          console.warn("⚠️ Could not get GPS:", result.error);
           setLocationStatus({
             success: false,
             message:
-              "⚠️ Could not get GPS location. Please enable location services.",
+              "⚠️ Could not get GPS location. Location verification may be skipped.",
           });
-          toast.error("Could not get GPS location.");
-          setIsGettingLocation(false);
-        },
-        { enableHighAccuracy: true, timeout: 10000 },
-      );
+          toast.warning("⚠️ GPS not available. Location verification skipped.");
+        }
+        setIsGettingLocation(false);
+      });
     } else {
-      toast.error("Geolocation not supported");
+      toast.warning(
+        "📍 Geolocation not supported. Location verification skipped.",
+      );
       setIsGettingLocation(false);
     }
 
@@ -380,7 +431,7 @@ export default function EditListingPage() {
   }
 
   const totalImages = existingImages.length + newImages.length;
-  const isSubmitting = updateMutation.isPending;
+  const isSubmitting = updateMutation.isPending || isUploadingImages;
 
   return (
     <div className="max-w-3xl mx-auto">
