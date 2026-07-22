@@ -1,13 +1,12 @@
 // src/pages/EditListingPage.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useDropzone } from "react-dropzone";
 import toast from "react-hot-toast";
 import API from "../services/api";
-import { XMarkIcon, PhotoIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon, CameraIcon } from "@heroicons/react/24/outline";
 
-// House types (same as create page)
+// House types
 const HOUSE_TYPES = [
   { value: "bedsitter", label: "Bedsitter" },
   { value: "studio", label: "Studio" },
@@ -18,6 +17,43 @@ const HOUSE_TYPES = [
   { value: "2bed_apartment", label: "2 Bedroom Apartment" },
   { value: "3bed_apartment", label: "3 Bedroom Apartment" },
   { value: "commercial", label: "Commercial Space" },
+];
+
+// ============ NEW: Layer 1 Dropdown Options ============
+const WATER_SOURCES = [
+  { value: "nairobi_water", label: "Nairobi Water" },
+  { value: "borehole", label: "Borehole" },
+  { value: "combination", label: "Combination" },
+];
+
+const WATER_METERING = [
+  { value: "flat_rate", label: "Flat Rate" },
+  { value: "tokenized", label: "Tokenized" },
+  { value: "included", label: "Included in Rent" },
+];
+
+const WATER_RATIONING = [
+  { value: "none", label: "None" },
+  { value: "mondays", label: "Mondays" },
+  { value: "tuesdays", label: "Tuesdays" },
+  { value: "wednesdays", label: "Wednesdays" },
+  { value: "thursdays", label: "Thursdays" },
+  { value: "fridays", label: "Fridays" },
+  { value: "saturdays", label: "Saturdays" },
+  { value: "sundays", label: "Sundays" },
+  { value: "alternate_days", label: "Alternate Days" },
+];
+
+const POWER_METERING = [
+  { value: "prepaid_kplc", label: "Prepaid KPLC Token" },
+  { value: "sub_meter", label: "Sub-meter" },
+];
+
+const BACKUP_POWER = [
+  { value: "full_generator", label: "Full Generator" },
+  { value: "common_area", label: "Common Area Only" },
+  { value: "solar", label: "Solar" },
+  { value: "none", label: "None" },
 ];
 
 // Fetch single listing
@@ -54,20 +90,52 @@ export default function EditListingPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const cameraInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
+    // Existing fields
     title: "",
     house_type: "studio",
     location: "",
     description: "",
     price: "",
     contact_phone: "",
+    latitude: "",
+    longitude: "",
+    // ============ NEW: Layer 1 Fields ============
+    // Utility & Fee Breakdown
+    service_charge: "",
+    trash_fee: "",
+    // Water Matrix
+    water_source: "",
+    water_metering: "",
+    water_rationing: "",
+    // Power Matrix
+    power_metering: "",
+    backup_power: "",
+    // Building Features (checkboxes)
+    has_lift: false,
+    has_cctv: false,
+    has_balcony: false,
+    has_rooftop: false,
+    has_parking: false,
+    has_fence: false,
+    // Commute & Logistics
+    matatu_distance: "",
+    matatu_walk_time: "",
+    fare_cbd_offpeak: "",
+    fare_cbd_peak: "",
+    supermarket_distance: "",
+    gym_distance: "",
+    food_delivery_available: false,
   });
 
   const [existingImages, setExistingImages] = useState([]);
   const [newImages, setNewImages] = useState([]);
   const [newImagePreviews, setNewImagePreviews] = useState([]);
   const [imagesToDelete, setImagesToDelete] = useState([]);
+  const [locationStatus, setLocationStatus] = useState(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   // Fetch existing listing data
   const {
@@ -83,12 +151,41 @@ export default function EditListingPage() {
   useEffect(() => {
     if (listing) {
       setFormData({
+        // Existing fields
         title: listing.title || "",
-        house_type: listing.house_type,
-        location: listing.location,
+        house_type: listing.house_type || "studio",
+        location: listing.location || "",
         description: listing.description || "",
         price: listing.price || "",
         contact_phone: listing.contact_phone || "",
+        latitude: listing.latitude || "",
+        longitude: listing.longitude || "",
+        // ============ NEW: Layer 1 Fields ============
+        // Utility & Fee Breakdown
+        service_charge: listing.service_charge || "",
+        trash_fee: listing.trash_fee || "",
+        // Water Matrix
+        water_source: listing.water_source || "",
+        water_metering: listing.water_metering || "",
+        water_rationing: listing.water_rationing || "",
+        // Power Matrix
+        power_metering: listing.power_metering || "",
+        backup_power: listing.backup_power || "",
+        // Building Features
+        has_lift: listing.has_lift || false,
+        has_cctv: listing.has_cctv || false,
+        has_balcony: listing.has_balcony || false,
+        has_rooftop: listing.has_rooftop || false,
+        has_parking: listing.has_parking || false,
+        has_fence: listing.has_fence || false,
+        // Commute & Logistics
+        matatu_distance: listing.matatu_distance || "",
+        matatu_walk_time: listing.matatu_walk_time || "",
+        fare_cbd_offpeak: listing.fare_cbd_offpeak || "",
+        fare_cbd_peak: listing.fare_cbd_peak || "",
+        supermarket_distance: listing.supermarket_distance || "",
+        gym_distance: listing.gym_distance || "",
+        food_delivery_available: listing.food_delivery_available || false,
       });
       setExistingImages(listing.images || []);
     }
@@ -97,7 +194,7 @@ export default function EditListingPage() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: updateListing,
-    onSuccess: async () => {
+    onSuccess: async (data) => {
       // Handle image deletions
       for (const imageId of imagesToDelete) {
         await deleteImage(imageId);
@@ -105,7 +202,14 @@ export default function EditListingPage() {
 
       // Handle new image uploads
       if (newImages.length > 0) {
-        await uploadImages({ listingId: id, images: newImages });
+        const result = await uploadImages({ listingId: id, images: newImages });
+        if (result.location_warnings && result.location_warnings.length > 0) {
+          const warning = result.location_warnings[0];
+          toast.warning(`⚠️ ${warning.warning}`);
+        }
+        if (result.location_verified) {
+          toast.success("📍 Location verified!");
+        }
       }
 
       toast.success("Listing updated successfully!");
@@ -120,7 +224,11 @@ export default function EditListingPage() {
 
   // Handle form input changes
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
   // Handle form submission
@@ -132,7 +240,39 @@ export default function EditListingPage() {
       return;
     }
 
-    updateMutation.mutate({ id, ...formData });
+    // Clean up form data - convert empty strings to null
+    const cleanedData = {};
+    for (const [key, value] of Object.entries(formData)) {
+      if (value === "" || value === null || value === undefined) {
+        cleanedData[key] = null;
+      } else if (typeof value === "string" && value.trim() === "") {
+        cleanedData[key] = null;
+      } else {
+        cleanedData[key] = value;
+      }
+    }
+
+    // Ensure numeric fields are properly parsed
+    const numericFields = [
+      "price",
+      "service_charge",
+      "trash_fee",
+      "matatu_distance",
+      "matatu_walk_time",
+      "fare_cbd_offpeak",
+      "fare_cbd_peak",
+      "supermarket_distance",
+      "gym_distance",
+      "latitude",
+      "longitude",
+    ];
+    numericFields.forEach((field) => {
+      if (cleanedData[field] !== null && cleanedData[field] !== undefined) {
+        cleanedData[field] = parseFloat(cleanedData[field]);
+      }
+    });
+
+    updateMutation.mutate({ id, ...cleanedData });
   };
 
   // Remove existing image
@@ -141,56 +281,80 @@ export default function EditListingPage() {
     setExistingImages(existingImages.filter((img) => img.id !== image.id));
   };
 
-  // Dropzone for new images
-  const onDrop = (acceptedFiles) => {
-    const currentCount = existingImages.length + newImages.length;
-    const remainingSlots = 10 - currentCount;
-
-    if (acceptedFiles.length > remainingSlots) {
-      toast.error(
-        `You can only upload ${remainingSlots} more image(s). Max 10 total.`,
-      );
+  // ============ CAMERA CAPTURE ============
+  const handleCameraCapture = (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      console.log("No file selected");
       return;
     }
 
-    const validFiles = [];
-    acceptedFiles.forEach((file) => {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name}: exceeds 10MB`);
-      } else if (!file.type.startsWith("image/")) {
-        toast.error(`${file.name}: not an image`);
-      } else {
-        validFiles.push(file);
-      }
-    });
+    console.log("📸 File captured:", file.name, file.type, file.size);
 
-    if (validFiles.length > 0) {
-      setNewImages([...newImages, ...validFiles]);
-
-      const newPreviews = validFiles.map((file) => ({
-        url: URL.createObjectURL(file),
-        name: file.name,
-      }));
-      setNewImagePreviews([...newImagePreviews, ...newPreviews]);
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      e.target.value = "";
+      return;
     }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image exceeds 10MB limit");
+      e.target.value = "";
+      return;
+    }
+
+    // Get GPS from device
+    setIsGettingLocation(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log("📍 GPS detected:", latitude, longitude);
+          setFormData((prev) => ({
+            ...prev,
+            latitude: latitude.toString(),
+            longitude: longitude.toString(),
+          }));
+          setLocationStatus({
+            success: true,
+            message: `📍 Location detected: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+          });
+          toast.success("📍 Location detected!");
+          setIsGettingLocation(false);
+        },
+        (error) => {
+          console.error("❌ Geolocation error:", error);
+          setLocationStatus({
+            success: false,
+            message:
+              "⚠️ Could not get GPS location. Please enable location services.",
+          });
+          toast.error("Could not get GPS location.");
+          setIsGettingLocation(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000 },
+      );
+    } else {
+      toast.error("Geolocation not supported");
+      setIsGettingLocation(false);
+    }
+
+    setNewImages([...newImages, file]);
+    const preview = {
+      url: URL.createObjectURL(file),
+      name: file.name || "Camera photo",
+      isCamera: true,
+    };
+    setNewImagePreviews([...newImagePreviews, preview]);
+
+    toast.success("📸 Photo captured!");
+    e.target.value = "";
   };
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: { "image/*": [] },
-    maxSize: 10 * 1024 * 1024,
-  });
-
-  // Remove new image
-  const removeNewImage = (index) => {
-    URL.revokeObjectURL(newImagePreviews[index].url);
-    const updatedImages = [...newImages];
-    updatedImages.splice(index, 1);
-    setNewImages(updatedImages);
-
-    const updatedPreviews = [...newImagePreviews];
-    updatedPreviews.splice(index, 1);
-    setNewImagePreviews(updatedPreviews);
+  const openCamera = () => {
+    if (cameraInputRef.current) {
+      cameraInputRef.current.click();
+    }
   };
 
   if (isLoading) {
@@ -226,97 +390,416 @@ export default function EditListingPage() {
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* House Type */}
-          <div>
-            <label className="label">Property Type *</label>
-            <select
-              name="house_type"
-              value={formData.house_type}
-              onChange={handleChange}
-              className="input"
-              required
-            >
-              {HOUSE_TYPES.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* ============ BASIC INFO ============ */}
+          <div className="border-b border-white/10 pb-6">
+            <h2 className="text-sm font-semibold text-gray-300 mb-4">
+              Basic Information
+            </h2>
 
-          {/* Title */}
-          <div>
-            <label className="label">Title (Optional)</label>
-            <input
-              type="text"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              placeholder="e.g., Spacious 2BR with Great View"
-              className="input"
-            />
-          </div>
-
-          {/* Location */}
-          <div>
-            <label className="label">Location *</label>
-            <input
-              type="text"
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              placeholder="e.g., Kilimani, Nairobi"
-              className="input"
-              required
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="label">Description</label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              rows={4}
-              placeholder="Describe the property..."
-              className="input resize-none"
-            />
-          </div>
-
-          {/* Price */}
-          <div>
-            <label className="label">Price (KSh per month)</label>
-            <input
-              type="number"
-              name="price"
-              value={formData.price}
-              onChange={handleChange}
-              placeholder="e.g., 25000"
-              className="input"
-            />
-          </div>
-
-          {/* Contact Phone */}
-          <div>
-            <label className="label">Contact Phone (Optional)</label>
-            <input
-              type="tel"
-              name="contact_phone"
-              value={formData.contact_phone}
-              onChange={handleChange}
-              placeholder="Leave blank to use your registered number"
-              className="input"
-            />
-          </div>
-
-          {/* Existing Images */}
-          {existingImages.length > 0 && (
+            {/* House Type */}
             <div>
+              <label className="label">Property Type *</label>
+              <select
+                name="house_type"
+                value={formData.house_type}
+                onChange={handleChange}
+                className="input"
+                required
+              >
+                {HOUSE_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Title */}
+            <div className="mt-4">
+              <label className="label">Title (Optional)</label>
+              <input
+                type="text"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                placeholder="e.g., Spacious 2BR with Great View"
+                className="input"
+              />
+            </div>
+
+            {/* Location */}
+            <div className="mt-4">
+              <label className="label">Location *</label>
+              <input
+                type="text"
+                name="location"
+                value={formData.location}
+                onChange={handleChange}
+                placeholder="e.g., Kilimani, Nairobi"
+                className="input"
+                required
+              />
+            </div>
+
+            {/* Hidden GPS fields */}
+            <input type="hidden" name="latitude" value={formData.latitude} />
+            <input type="hidden" name="longitude" value={formData.longitude} />
+
+            {/* Location Status */}
+            {locationStatus && (
+              <div
+                className={`mt-4 p-3 rounded-lg text-sm ${
+                  locationStatus.success
+                    ? "bg-green-500/10 border border-green-500/30 text-green-400"
+                    : "bg-yellow-500/10 border border-yellow-500/30 text-yellow-400"
+                }`}
+              >
+                {locationStatus.message}
+              </div>
+            )}
+            {isGettingLocation && (
+              <div className="mt-4 p-3 rounded-lg text-sm bg-blue-500/10 border border-blue-500/30 text-blue-400">
+                📡 Getting your location...
+              </div>
+            )}
+
+            {/* Description */}
+            <div className="mt-4">
+              <label className="label">Description</label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows={4}
+                placeholder="Describe the property..."
+                className="input resize-none"
+              />
+            </div>
+
+            {/* Price */}
+            <div className="mt-4">
+              <label className="label">Price (KSh per month)</label>
+              <input
+                type="number"
+                name="price"
+                value={formData.price}
+                onChange={handleChange}
+                placeholder="e.g., 25000"
+                className="input"
+              />
+            </div>
+
+            {/* Contact Phone */}
+            <div className="mt-4">
+              <label className="label">Contact Phone (Optional)</label>
+              <input
+                type="tel"
+                name="contact_phone"
+                value={formData.contact_phone}
+                onChange={handleChange}
+                placeholder="Leave blank to use your registered number"
+                className="input"
+              />
+            </div>
+          </div>
+
+          {/* ============ UTILITY & FEE BREAKDOWN ============ */}
+          <div className="border-b border-white/10 pb-6">
+            <h2 className="text-sm font-semibold text-gray-300 mb-4">
+              Utility & Fee Breakdown
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Service Charge (KSh)</label>
+                <input
+                  type="number"
+                  name="service_charge"
+                  value={formData.service_charge}
+                  onChange={handleChange}
+                  placeholder="e.g., 5000"
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">Trash Fee (KSh)</label>
+                <input
+                  type="number"
+                  name="trash_fee"
+                  value={formData.trash_fee}
+                  onChange={handleChange}
+                  placeholder="e.g., 1000"
+                  className="input"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-500 mt-2">
+              💰 Total monthly cost = Rent + Service Charge + Trash Fee
+            </p>
+          </div>
+
+          {/* ============ WATER MATRIX ============ */}
+          <div className="border-b border-white/10 pb-6">
+            <h2 className="text-sm font-semibold text-gray-300 mb-4">
+              💧 Water Information
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Water Source</label>
+                <select
+                  name="water_source"
+                  value={formData.water_source}
+                  onChange={handleChange}
+                  className="input"
+                >
+                  <option value="">Select source</option>
+                  {WATER_SOURCES.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Water Metering</label>
+                <select
+                  name="water_metering"
+                  value={formData.water_metering}
+                  onChange={handleChange}
+                  className="input"
+                >
+                  <option value="">Select metering</option>
+                  {WATER_METERING.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="label">Water Rationing</label>
+                <select
+                  name="water_rationing"
+                  value={formData.water_rationing}
+                  onChange={handleChange}
+                  className="input"
+                >
+                  <option value="">Select rationing schedule</option>
+                  {WATER_RATIONING.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* ============ POWER MATRIX ============ */}
+          <div className="border-b border-white/10 pb-6">
+            <h2 className="text-sm font-semibold text-gray-300 mb-4">
+              ⚡ Power Information
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Power Metering</label>
+                <select
+                  name="power_metering"
+                  value={formData.power_metering}
+                  onChange={handleChange}
+                  className="input"
+                >
+                  <option value="">Select metering</option>
+                  {POWER_METERING.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Backup Power</label>
+                <select
+                  name="backup_power"
+                  value={formData.backup_power}
+                  onChange={handleChange}
+                  className="input"
+                >
+                  <option value="">Select backup</option>
+                  {BACKUP_POWER.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* ============ BUILDING FEATURES ============ */}
+          <div className="border-b border-white/10 pb-6">
+            <h2 className="text-sm font-semibold text-gray-300 mb-4">
+              🏢 Building Features
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="has_lift"
+                  checked={formData.has_lift}
+                  onChange={handleChange}
+                  className="w-4 h-4 accent-blue-500"
+                />
+                Elevator/Lift
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="has_cctv"
+                  checked={formData.has_cctv}
+                  onChange={handleChange}
+                  className="w-4 h-4 accent-blue-500"
+                />
+                CCTV
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="has_balcony"
+                  checked={formData.has_balcony}
+                  onChange={handleChange}
+                  className="w-4 h-4 accent-blue-500"
+                />
+                Balcony
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="has_rooftop"
+                  checked={formData.has_rooftop}
+                  onChange={handleChange}
+                  className="w-4 h-4 accent-blue-500"
+                />
+                Rooftop Access
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="has_parking"
+                  checked={formData.has_parking}
+                  onChange={handleChange}
+                  className="w-4 h-4 accent-blue-500"
+                />
+                Dedicated Parking
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="has_fence"
+                  checked={formData.has_fence}
+                  onChange={handleChange}
+                  className="w-4 h-4 accent-blue-500"
+                />
+                Perimeter Fence
+              </label>
+            </div>
+          </div>
+
+          {/* ============ COMMUTE & LOGISTICS ============ */}
+          <div className="border-b border-white/10 pb-6">
+            <h2 className="text-sm font-semibold text-gray-300 mb-4">
+              🚌 Commute & Logistics
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Distance to Matatu (meters)</label>
+                <input
+                  type="number"
+                  name="matatu_distance"
+                  value={formData.matatu_distance}
+                  onChange={handleChange}
+                  placeholder="e.g., 200"
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">Walk Time to Matatu (minutes)</label>
+                <input
+                  type="number"
+                  name="matatu_walk_time"
+                  value={formData.matatu_walk_time}
+                  onChange={handleChange}
+                  placeholder="e.g., 3"
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">Fare to CBD (Off-peak)</label>
+                <input
+                  type="number"
+                  name="fare_cbd_offpeak"
+                  value={formData.fare_cbd_offpeak}
+                  onChange={handleChange}
+                  placeholder="e.g., 100"
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">Fare to CBD (Peak)</label>
+                <input
+                  type="number"
+                  name="fare_cbd_peak"
+                  value={formData.fare_cbd_peak}
+                  onChange={handleChange}
+                  placeholder="e.g., 150"
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">
+                  Distance to Supermarket (meters)
+                </label>
+                <input
+                  type="number"
+                  name="supermarket_distance"
+                  value={formData.supermarket_distance}
+                  onChange={handleChange}
+                  placeholder="e.g., 500"
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">Distance to Gym (meters)</label>
+                <input
+                  type="number"
+                  name="gym_distance"
+                  value={formData.gym_distance}
+                  onChange={handleChange}
+                  placeholder="e.g., 800"
+                  className="input"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="food_delivery_available"
+                    checked={formData.food_delivery_available}
+                    onChange={handleChange}
+                    className="w-4 h-4 accent-blue-500"
+                  />
+                  Food Delivery Available (Bolt/Uber Eats)
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* ============ EXISTING IMAGES ============ */}
+          {existingImages.length > 0 && (
+            <div className="border-b border-white/10 pb-6">
               <label className="label">
                 Current Images ({existingImages.length})
               </label>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-4 gap-3 mt-2">
                 {existingImages.map((image) => (
                   <div key={image.id} className="relative group">
                     <img
@@ -337,53 +820,89 @@ export default function EditListingPage() {
             </div>
           )}
 
-          {/* New Images Upload */}
+          {/* ============ ADD MORE IMAGES - CAMERA ONLY ============ */}
           <div>
-            <label className="label">Add More Images ({totalImages}/10)</label>
+            <label className="label">
+              {totalImages > 0 ? "Add More Photos" : "Take Photos"}
+              <span className="text-xs text-red-400 ml-2">
+                ({totalImages}/10) - Camera only
+              </span>
+            </label>
 
-            <div
-              {...getRootProps()}
-              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition ${
-                isDragActive
-                  ? "border-blue-500 bg-blue-500/10"
-                  : "border-white/15 hover:border-blue-500/50 bg-black/30"
-              }`}
-            >
-              <input {...getInputProps()} />
-              <PhotoIcon className="w-12 h-12 text-gray-500 mx-auto mb-2" />
-              {isDragActive ? (
-                <p className="text-blue-400">Drop the images here...</p>
-              ) : (
-                <p className="text-gray-400">
-                  Drag & drop new images here, or click to select
-                </p>
-              )}
-              <p className="text-[10px] text-gray-500 mt-2">
-                Max 10 images total, up to 10MB each
+            {/* Hidden camera input */}
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleCameraCapture}
+            />
+
+            <div className="border-2 border-dashed border-white/15 rounded-xl p-6 text-center bg-black/30">
+              <CameraIcon className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+              <p className="text-white font-medium">
+                Take a Photo at the Property
               </p>
+              <p className="text-gray-400 text-sm mt-1">
+                You must be at the property location to take photos
+              </p>
+              <button
+                type="button"
+                onClick={openCamera}
+                className="btn-primary inline-flex items-center gap-2 mt-4"
+              >
+                <CameraIcon className="w-5 h-5" />
+                Open Camera
+              </button>
             </div>
 
             {/* New Image Previews */}
             {newImagePreviews.length > 0 && (
-              <div className="mt-4 grid grid-cols-4 gap-3">
-                {newImagePreviews.map((preview, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={preview.url}
-                      alt={preview.name}
-                      className="w-full h-24 object-cover rounded-lg border border-white/10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeNewImage(index)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
-                    >
-                      <XMarkIcon className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
+              <div className="mt-4">
+                <div className="grid grid-cols-4 gap-3">
+                  {newImagePreviews.map((preview, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={preview.url}
+                        alt={preview.name}
+                        className="w-full h-24 object-cover rounded-lg border border-white/10"
+                      />
+                      <span className="absolute top-1 left-1 bg-blue-500/80 text-white text-[8px] px-1.5 py-0.5 rounded">
+                        📸 Camera
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          URL.revokeObjectURL(newImagePreviews[index].url);
+                          const updatedImages = [...newImages];
+                          updatedImages.splice(index, 1);
+                          setNewImages(updatedImages);
+                          const updatedPreviews = [...newImagePreviews];
+                          updatedPreviews.splice(index, 1);
+                          setNewImagePreviews(updatedPreviews);
+                        }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                      >
+                        <XMarkIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
+          </div>
+
+          {/* Location Notice */}
+          <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
+            <p className="text-sm text-blue-300 flex items-start gap-2">
+              <span className="text-lg">📍</span>
+              <span>
+                <strong>Location Verification:</strong> When you take a photo
+                with your camera, the GPS location is embedded in the photo. The
+                system will verify you are at the property location.
+              </span>
+            </p>
           </div>
 
           {/* Submit Buttons */}

@@ -118,3 +118,6 @@
     @apply py-2 px-4 text-sm rounded-lg;
   }
 }
+.btn-danger {
+  @apply bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-xl transition border border-red-500/20 disabled:opacity-50;
+}

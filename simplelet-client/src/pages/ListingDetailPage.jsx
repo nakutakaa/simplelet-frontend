@@ -6,6 +6,9 @@ import toast from "react-hot-toast";
 import API from "../services/api";
 import ImageSwiper from "../components/ImageSwiper";
 import CommentItem from "../components/CommentItem";
+import ReviewSection from "../components/ReviewSection";
+import WhatsAppButton from "../components/WhatsAppButton";
+import CredibilityBadge from "../components/CredibilityBadge";
 
 // Helper function to get optimized Cloudinary URL
 const getOptimizedImageUrl = (url, width = 800, height = 600) => {
@@ -39,7 +42,13 @@ const fetchComments = async (listingId) => {
   return data;
 };
 
-// Post comment - ONLY for logged-in users
+// Fetch reviews
+const fetchReviews = async (listingId) => {
+  const { data } = await API.get(`/reviews/listings/${listingId}`);
+  return data;
+};
+
+// Post comment
 const postComment = async ({ listingId, content }) => {
   const { data } = await API.post(`/comments/listings/${listingId}/comments`, {
     content,
@@ -62,7 +71,7 @@ export default function ListingDetailPage() {
   const user = JSON.parse(localStorage.getItem("user") || "null");
   const isLoggedIn = !!token && user;
 
-  // Check favorite status (only if logged in)
+  // Check favorite status
   useEffect(() => {
     const checkFavorite = async () => {
       if (!id || !isLoggedIn) return;
@@ -76,7 +85,7 @@ export default function ListingDetailPage() {
     checkFavorite();
   }, [id, isLoggedIn]);
 
-  // Toggle favorite (only if logged in)
+  // Toggle favorite
   const toggleFavorite = async () => {
     if (!isLoggedIn) {
       toast.error("Please login to save favorites");
@@ -97,6 +106,7 @@ export default function ListingDetailPage() {
     data: listing,
     isLoading,
     error,
+    refetch: refetchListing,
   } = useQuery({
     queryKey: ["listing", id],
     queryFn: () => fetchListing(id),
@@ -113,7 +123,18 @@ export default function ListingDetailPage() {
     enabled: !!id,
   });
 
-  // Post comment mutation (ONLY for logged-in users)
+  // Fetch reviews
+  const {
+    data: reviewsData,
+    isLoading: reviewsLoading,
+    refetch: refetchReviews,
+  } = useQuery({
+    queryKey: ["reviews", id],
+    queryFn: () => fetchReviews(id),
+    enabled: !!id,
+  });
+
+  // Post comment mutation
   const commentMutation = useMutation({
     mutationFn: postComment,
     onSuccess: () => {
@@ -162,6 +183,12 @@ export default function ListingDetailPage() {
     });
   };
 
+  const handleReviewSubmitted = () => {
+    refetchReviews();
+    refetchListing();
+    toast.success("Review submitted! Thank you for your feedback.");
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -182,6 +209,21 @@ export default function ListingDetailPage() {
   }
 
   const hasImages = listing.images && listing.images.length > 0;
+  const author = listing.author || {};
+  const isExpired = listing.is_expired || false;
+  const expiryStatus = listing.expiry_status || "active";
+  const expiryStatusText = listing.expiry_status_text || "Active";
+  const daysRemaining = listing.days_remaining;
+
+  // Helper to render feature check
+  const renderFeature = (label, value) => {
+    if (value === undefined || value === null) return null;
+    return (
+      <span className={`text-xs ${value ? "text-green-400" : "text-gray-500"}`}>
+        {value ? "✅" : "❌"} {label}
+      </span>
+    );
+  };
 
   return (
     <div className="max-w-4xl mx-auto pb-8">
@@ -189,7 +231,6 @@ export default function ListingDetailPage() {
       <div className="bg-black rounded-2xl border border-white/10 overflow-hidden mb-6">
         {hasImages ? (
           <div>
-            {/* Main Image - Optimized */}
             <div
               className="relative cursor-pointer group"
               onClick={() => openImageSwiper(0)}
@@ -200,23 +241,17 @@ export default function ListingDetailPage() {
                 className="w-full h-[400px] object-cover"
                 loading="eager"
               />
-
-              {/* Image count badge */}
               {listing.images.length > 1 && (
                 <div className="absolute bottom-4 right-4 bg-black/60 text-white text-sm px-3 py-1 rounded-full">
                   {listing.images.length} photos
                 </div>
               )}
-
-              {/* Overlay on hover */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
                 <span className="opacity-0 group-hover:opacity-100 text-white text-sm bg-black/50 px-3 py-1 rounded-full transition">
                   Tap to view gallery
                 </span>
               </div>
             </div>
-
-            {/* Thumbnail strip - Optimized */}
             {listing.images.length > 1 && (
               <div className="flex gap-2 p-2 overflow-x-auto">
                 {listing.images.slice(0, 5).map((image, idx) => (
@@ -263,7 +298,7 @@ export default function ListingDetailPage() {
         )}
       </div>
 
-      {/* Image Swiper Modal - Pass optimized images */}
+      {/* Image Swiper Modal */}
       {swiperOpen && hasImages && (
         <ImageSwiper
           images={listing.images.map((img) => ({
@@ -281,7 +316,28 @@ export default function ListingDetailPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-white">
             {listing.title}
           </h1>
-          {listing.is_taken && <span className="badge-red">Taken</span>}
+          <div className="flex flex-col items-end gap-1">
+            {listing.is_taken && <span className="badge-red">Taken</span>}
+            {isExpired && <span className="badge-red">Expired</span>}
+            {!isExpired && !listing.is_taken && (
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full border ${
+                  expiryStatus === "active"
+                    ? "border-green-500/30 text-green-400 bg-green-500/10"
+                    : expiryStatus === "needs_confirmation"
+                      ? "border-yellow-500/30 text-yellow-400 bg-yellow-500/10"
+                      : "border-orange-500/30 text-orange-400 bg-orange-500/10"
+                }`}
+              >
+                {expiryStatusText}
+              </span>
+            )}
+            {!isExpired && !listing.is_taken && daysRemaining !== undefined && (
+              <span className="text-[10px] text-gray-500">
+                {daysRemaining} days remaining
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Location */}
@@ -308,7 +364,25 @@ export default function ListingDetailPage() {
           <span>{listing.location}</span>
         </div>
 
-        {/* Price */}
+        {/* Author Credibility Badge */}
+        {author.id && (
+          <div className="mb-4 p-3 bg-black/30 rounded-xl border border-white/5">
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <p className="text-xs text-gray-500">Posted by</p>
+                <p className="font-medium text-white">{author.name}</p>
+              </div>
+              <CredibilityBadge
+                userId={author.id}
+                score={author.credibility_score}
+                badge={author.badge}
+                isVerified={author.is_verified}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Price & True Monthly Cost */}
         <div className="mb-4">
           <p className="text-2xl sm:text-3xl font-bold text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text">
             KSh {listing.price?.toLocaleString()}
@@ -319,6 +393,14 @@ export default function ListingDetailPage() {
               </span>
             )}
           </p>
+          {listing.true_monthly_cost &&
+            listing.true_monthly_cost !== listing.price && (
+              <p className="text-xs text-gray-400 mt-1">
+                💰 Total monthly: KSh{" "}
+                {listing.true_monthly_cost.toLocaleString()}
+                (incl. service charge)
+              </p>
+            )}
         </div>
 
         {/* Description */}
@@ -333,7 +415,7 @@ export default function ListingDetailPage() {
           </div>
         )}
 
-        {/* Favorite Button - Only for logged-in users */}
+        {/* Favorite Button */}
         {isLoggedIn ? (
           <button
             onClick={toggleFavorite}
@@ -379,7 +461,194 @@ export default function ListingDetailPage() {
           </Link>
         )}
 
-        {/* Property Details */}
+        {/* ============ LAYER 1: UTILITY & FEES ============ */}
+        {(listing.service_charge > 0 || listing.trash_fee > 0) && (
+          <div className="border-t border-white/10 pt-4 mb-4">
+            <h3 className="text-sm font-semibold text-gray-300 mb-2">
+              💰 Fees & Charges
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              {listing.service_charge > 0 && (
+                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500">Service Charge</p>
+                  <p className="font-medium text-white text-sm">
+                    KSh {listing.service_charge.toLocaleString()}
+                  </p>
+                </div>
+              )}
+              {listing.trash_fee > 0 && (
+                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500">Trash Fee</p>
+                  <p className="font-medium text-white text-sm">
+                    KSh {listing.trash_fee.toLocaleString()}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ============ LAYER 1: WATER MATRIX ============ */}
+        {(listing.water_source ||
+          listing.water_metering ||
+          listing.water_rationing) && (
+          <div className="border-t border-white/10 pt-4 mb-4">
+            <h3 className="text-sm font-semibold text-gray-300 mb-2">
+              💧 Water Information
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {listing.water_source && (
+                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500">Source</p>
+                  <p className="font-medium text-white text-sm">
+                    {listing.water_source_display}
+                  </p>
+                </div>
+              )}
+              {listing.water_metering && (
+                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500">Metering</p>
+                  <p className="font-medium text-white text-sm">
+                    {listing.water_metering_display}
+                  </p>
+                </div>
+              )}
+              {listing.water_rationing &&
+                listing.water_rationing !== "none" && (
+                  <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500">Rationing</p>
+                    <p className="font-medium text-white text-sm">
+                      {listing.water_rationing_display}
+                    </p>
+                  </div>
+                )}
+            </div>
+          </div>
+        )}
+
+        {/* ============ LAYER 1: POWER MATRIX ============ */}
+        {(listing.power_metering || listing.backup_power) && (
+          <div className="border-t border-white/10 pt-4 mb-4">
+            <h3 className="text-sm font-semibold text-gray-300 mb-2">
+              ⚡ Power Information
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              {listing.power_metering && (
+                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500">Metering</p>
+                  <p className="font-medium text-white text-sm">
+                    {listing.power_metering_display}
+                  </p>
+                </div>
+              )}
+              {listing.backup_power && (
+                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500">Backup Power</p>
+                  <p className="font-medium text-white text-sm">
+                    {listing.backup_power_display}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ============ LAYER 1: BUILDING FEATURES ============ */}
+        {(listing.has_lift ||
+          listing.has_cctv ||
+          listing.has_balcony ||
+          listing.has_rooftop ||
+          listing.has_parking ||
+          listing.has_fence) && (
+          <div className="border-t border-white/10 pt-4 mb-4">
+            <h3 className="text-sm font-semibold text-gray-300 mb-2">
+              🏢 Building Features
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {renderFeature("Elevator/Lift", listing.has_lift)}
+              {renderFeature("CCTV", listing.has_cctv)}
+              {renderFeature("Balcony", listing.has_balcony)}
+              {renderFeature("Rooftop Access", listing.has_rooftop)}
+              {renderFeature("Dedicated Parking", listing.has_parking)}
+              {renderFeature("Perimeter Fence", listing.has_fence)}
+            </div>
+          </div>
+        )}
+
+        {/* ============ LAYER 1: COMMUTE & LOGISTICS ============ */}
+        {(listing.matatu_distance ||
+          listing.matatu_walk_time ||
+          listing.fare_cbd_offpeak ||
+          listing.fare_cbd_peak ||
+          listing.supermarket_distance ||
+          listing.gym_distance) && (
+          <div className="border-t border-white/10 pt-4 mb-4">
+            <h3 className="text-sm font-semibold text-gray-300 mb-2">
+              🚌 Commute & Logistics
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {listing.matatu_distance && (
+                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500">Matatu Distance</p>
+                  <p className="font-medium text-white text-sm">
+                    {listing.matatu_distance}m
+                  </p>
+                </div>
+              )}
+              {listing.matatu_walk_time && (
+                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500">Walk Time</p>
+                  <p className="font-medium text-white text-sm">
+                    {listing.matatu_walk_time} min
+                  </p>
+                </div>
+              )}
+              {listing.fare_cbd_offpeak && (
+                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500">
+                    Fare to CBD (Off-peak)
+                  </p>
+                  <p className="font-medium text-white text-sm">
+                    KSh {listing.fare_cbd_offpeak}
+                  </p>
+                </div>
+              )}
+              {listing.fare_cbd_peak && (
+                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500">
+                    Fare to CBD (Peak)
+                  </p>
+                  <p className="font-medium text-white text-sm">
+                    KSh {listing.fare_cbd_peak}
+                  </p>
+                </div>
+              )}
+              {listing.supermarket_distance && (
+                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500">Supermarket</p>
+                  <p className="font-medium text-white text-sm">
+                    {listing.supermarket_distance}m
+                  </p>
+                </div>
+              )}
+              {listing.gym_distance && (
+                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500">Gym</p>
+                  <p className="font-medium text-white text-sm">
+                    {listing.gym_distance}m
+                  </p>
+                </div>
+              )}
+            </div>
+            {listing.food_delivery_available && (
+              <p className="text-xs text-green-400 mt-2">
+                ✅ Food delivery available (Bolt/Uber Eats)
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Property Details (Basic) */}
         <div className="border-t border-white/10 pt-4 mb-6">
           <h3 className="text-sm font-semibold text-gray-300 mb-3">
             Property Details
@@ -414,47 +683,70 @@ export default function ListingDetailPage() {
           </div>
         </div>
 
-        {/* Contact Section */}
+        {/* Contact Section with WhatsApp */}
         <div className="border-t border-white/10 pt-6">
           {!showContact ? (
             <button onClick={handleContactClick} className="w-full btn-primary">
               Reveal Contact Number
             </button>
           ) : (
-            <div className="bg-black/50 border border-white/10 rounded-xl p-4 text-center">
-              <p className="text-sm text-gray-400 mb-2">Contact Seller</p>
-              <div className="flex items-center justify-center gap-3">
-                <a
-                  href={`tel:${listing.contact_phone}`}
-                  className="text-blue-400 font-semibold text-lg hover:text-blue-300 transition"
-                >
-                  {listing.contact_phone}
-                </a>
-                <button
-                  onClick={handleCopyPhone}
-                  className="text-gray-400 hover:text-white transition"
-                  title="Copy to clipboard"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+            <div className="space-y-3">
+              <div className="bg-black/50 border border-white/10 rounded-xl p-4 text-center">
+                <p className="text-sm text-gray-400 mb-2">Contact Seller</p>
+                <div className="flex items-center justify-center gap-3">
+                  <a
+                    href={`tel:${listing.contact_phone}`}
+                    className="text-blue-400 font-semibold text-lg hover:text-blue-300 transition"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                    />
-                  </svg>
-                </button>
+                    {listing.contact_phone}
+                  </a>
+                  <button
+                    onClick={handleCopyPhone}
+                    className="text-gray-400 hover:text-white transition"
+                    title="Copy to clipboard"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2">
+                  Click to call or copy the number
+                </p>
               </div>
-              <p className="text-[10px] text-gray-500 mt-2">
-                Click to call or copy the number
-              </p>
+
+              {/* WhatsApp Button */}
+              <WhatsAppButton
+                listingId={listing.id}
+                userPhone={listing.contact_phone}
+                listingTitle={listing.title}
+                listingPrice={listing.price}
+              />
             </div>
           )}
+        </div>
+
+        {/* ============ Review Section ============ */}
+        <div className="mt-6 border-t border-white/10 pt-6">
+          <ReviewSection
+            listingId={listing.id}
+            listingTitle={listing.title}
+            reviews={reviewsData}
+            isLoading={reviewsLoading}
+            isLoggedIn={isLoggedIn}
+            userId={user?.id}
+            onReviewSubmitted={handleReviewSubmitted}
+          />
         </div>
 
         {/* Comments Section */}
@@ -468,7 +760,7 @@ export default function ListingDetailPage() {
             )}
           </h3>
 
-          {/* Comment Input - ONLY for logged-in users */}
+          {/* Comment Input */}
           {isLoggedIn ? (
             <form onSubmit={handleCommentSubmit} className="flex gap-3 mb-6">
               <input
