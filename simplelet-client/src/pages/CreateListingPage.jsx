@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
 import { XMarkIcon, PhotoIcon, CameraIcon } from "@heroicons/react/24/outline";
+import MapPicker from "../components/MapPicker";
 
 // House types from backend
 const HOUSE_TYPES = [
@@ -87,6 +88,7 @@ export default function CreateListingPage() {
 
   const [listingId, setListingId] = useState(null);
   const [isRollingBack, setIsRollingBack] = useState(false);
+  const [pinLocation, setPinLocation] = useState(null);
   const [formData, setFormData] = useState({
     // Existing fields
     title: "",
@@ -97,6 +99,9 @@ export default function CreateListingPage() {
     contact_phone: "",
     latitude: "",
     longitude: "",
+    // ============ NEW: Pin Location Fields ============
+    pin_latitude: "",
+    pin_longitude: "",
     // ============ Layer 1 Fields ============
     service_charge: "",
     trash_fee: "",
@@ -216,6 +221,18 @@ export default function CreateListingPage() {
     }));
   };
 
+  // Handle pin drop from map
+  const handlePinDrop = (location) => {
+    console.log("📍 Pin dropped:", location);
+    setPinLocation(location);
+    setFormData((prev) => ({
+      ...prev,
+      pin_latitude: location.latitude.toString(),
+      pin_longitude: location.longitude.toString(),
+    }));
+    toast.success("📍 Pin placed on map!");
+  };
+
   // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -260,6 +277,8 @@ export default function CreateListingPage() {
       "gym_distance",
       "latitude",
       "longitude",
+      "pin_latitude",
+      "pin_longitude",
     ];
     numericFields.forEach((field) => {
       if (cleanedData[field] !== null && cleanedData[field] !== undefined) {
@@ -337,16 +356,14 @@ export default function CreateListingPage() {
           setLocationStatus({
             success: false,
             message:
-              "⚠️ Could not get GPS location. Location verification may be skipped.",
+              "⚠️ Could not get GPS location. Using pin location if available.",
           });
-          toast.warning("⚠️ GPS not available. Location verification skipped.");
+          toast.warning("⚠️ GPS not available. Using pin location if set.");
         }
         setIsGettingLocation(false);
       });
     } else {
-      toast.warning(
-        "📍 Geolocation not supported. Location verification skipped.",
-      );
+      toast.warning("📍 Geolocation not supported. Using pin location if set.");
       setIsGettingLocation(false);
     }
 
@@ -512,6 +529,44 @@ export default function CreateListingPage() {
                 className="input"
               />
             </div>
+          </div>
+
+          {/* ============ MAP PICKER ============ */}
+          <div className="border-b border-white/10 pb-6">
+            <h2 className="text-sm font-semibold text-gray-300 mb-4">
+              📍 Drop a Pin on the Property Location
+            </h2>
+            <p className="text-xs text-gray-400 mb-3">
+              Click on the map to mark exactly where the property is located.
+              This helps renters find the exact location and verifies your
+              listing.
+              <span className="text-yellow-400 ml-1">
+                ⚠️ Required: Drop a pin to help verify your location.
+              </span>
+            </p>
+            <MapPicker
+              onLocationSelect={handlePinDrop}
+              initialZoom={15}
+              height="350px"
+              setPinLocation={setPinLocation}
+              isVerified={!!pinLocation}
+              showSearch={true}
+            />
+            {pinLocation && (
+              <div className="mt-2 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <p className="text-xs text-green-400">
+                  ✅ Pin dropped at: {pinLocation.latitude.toFixed(6)},{" "}
+                  {pinLocation.longitude.toFixed(6)}
+                </p>
+              </div>
+            )}
+            {!pinLocation && (
+              <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="text-xs text-yellow-400">
+                  ⚠️ Please drop a pin on the map to mark the property location
+                </p>
+              </div>
+            )}
           </div>
 
           {/* ============ UTILITY & FEE BREAKDOWN ============ */}
@@ -879,10 +934,11 @@ export default function CreateListingPage() {
             <p className="text-sm text-blue-300 flex items-start gap-2">
               <span className="text-lg">📍</span>
               <span>
-                <strong>Location Verification:</strong> When you take a photo
-                with your camera, the GPS location is embedded in the photo. The
-                system will verify you are at the property location. Photos
-                without GPS data will be flagged.
+                <strong>Location Verification:</strong> Drop a pin on the map to
+                mark the property location. When you take a photo with your
+                camera, the GPS location is embedded in the photo. The system
+                will verify you are at the property location. Photos without GPS
+                data will use the pin location as fallback.
               </span>
             </p>
           </div>
@@ -898,7 +954,7 @@ export default function CreateListingPage() {
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || images.length === 0}
+              disabled={isSubmitting || images.length === 0 || !pinLocation}
               className="flex-1 btn-primary disabled:opacity-50"
             >
               {isSubmitting

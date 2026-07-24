@@ -12,6 +12,7 @@ import EditListingPage from "./pages/EditListingPage";
 import ListingDetailPage from "./pages/ListingDetailPage";
 import ProfilePage from "./pages/ProfilePage";
 import FavoritesPage from "./pages/FavoritesPage";
+import "leaflet/dist/leaflet.css";
 
 function App() {
   return (
