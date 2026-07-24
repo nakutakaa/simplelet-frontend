@@ -24,7 +24,21 @@ const SORT_OPTIONS = [
   { value: "newest", label: "Newest First" },
   { value: "price_asc", label: "Price: Low to High" },
   { value: "price_desc", label: "Price: High to Low" },
+  { value: "distance", label: "Nearest First" },
 ];
+
+// Property type similarity mapping
+// This helps find similar properties when exact type isn't available
+const PROPERTY_TYPE_SIMILARITY = {
+  studio: ["bedsitter", "single_room"],
+  bedsitter: ["studio", "single_room"],
+  single_room: ["studio", "bedsitter"],
+  "1bed_apartment": ["1bed_bungalow", "2bed_apartment"],
+  "1bed_bungalow": ["1bed_apartment", "2bed_bungalow"],
+  "2bed_apartment": ["1bed_apartment", "2bed_bungalow", "3bed_apartment"],
+  "2bed_bungalow": ["1bed_bungalow", "2bed_apartment"],
+  "3bed_apartment": ["2bed_apartment", "3bed_bungalow"],
+};
 
 const fetchListings = async (params) => {
   const { data } = await API.get("/listings", { params });
@@ -41,7 +55,12 @@ export default function HomePage() {
     price_min: searchParams.get("price_min") || "",
     price_max: searchParams.get("price_max") || "",
     sort_by: searchParams.get("sort_by") || "newest",
+    nearby: searchParams.get("nearby") || "",
   });
+
+  const [userLocation, setUserLocation] = useState(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [showNearby, setShowNearby] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["listings", filters],
@@ -74,7 +93,75 @@ export default function HomePage() {
       price_min: "",
       price_max: "",
       sort_by: "newest",
+      nearby: "",
     });
+    setShowNearby(false);
+    setUserLocation(null);
+  };
+
+  // ============ GET USER LOCATION FOR NEARBY SEARCH ============
+  const getUserLocation = () => {
+    setIsGettingLocation(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ lat: latitude, lng: longitude });
+          setShowNearby(true);
+          setFilters((prev) => ({
+            ...prev,
+            nearby: `${latitude},${longitude}`,
+            sort_by: "distance",
+          }));
+          toast.success("📍 Location found! Showing nearby listings.");
+          setIsGettingLocation(false);
+          refetch();
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          toast.error(
+            "Could not get your location. Please enable location services.",
+          );
+          setIsGettingLocation(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000 },
+      );
+    } else {
+      toast.error("Geolocation is not supported by your browser.");
+      setIsGettingLocation(false);
+    }
+  };
+
+  // ============ GET SIMILAR PROPERTY TYPES ============
+  const getSimilarTypes = (type) => {
+    if (!type) return [];
+    return PROPERTY_TYPE_SIMILARITY[type] || [];
+  };
+
+  // ============ RENDER SUGGESTIONS ============
+  const renderSuggestions = () => {
+    const currentType = filters.house_type;
+    if (!currentType) return null;
+
+    const similarTypes = getSimilarTypes(currentType);
+    if (similarTypes.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap gap-2 mt-2">
+        <span className="text-xs text-gray-400">Similar types:</span>
+        {similarTypes.map((type) => (
+          <button
+            key={type}
+            onClick={() => {
+              setFilters((prev) => ({ ...prev, house_type: type }));
+            }}
+            className="text-xs bg-white/5 hover:bg-white/10 text-gray-300 px-2 py-0.5 rounded-full border border-white/10 transition"
+          >
+            {HOUSE_TYPES.find((t) => t.value === type)?.label || type}
+          </button>
+        ))}
+      </div>
+    );
   };
 
   // Get expiry status color and label
@@ -117,6 +204,14 @@ export default function HomePage() {
     return icons[badge.level] || "⚪";
   };
 
+  // Check if a listing is similar type to the filter
+  const isSimilarType = (listingType, filterType) => {
+    if (!filterType) return true;
+    if (listingType === filterType) return true;
+    const similar = getSimilarTypes(filterType);
+    return similar.includes(listingType);
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -132,11 +227,15 @@ export default function HomePage() {
         <p className="text-red-400">
           Failed to load listings. Please try again.
         </p>
+        <button onClick={() => refetch()} className="btn-primary mt-4 text-sm">
+          Retry
+        </button>
       </div>
     );
   }
 
   const listings = data?.listings || [];
+  const hasLocation = userLocation || filters.nearby;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -240,14 +339,75 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* ============ NEARBY SEARCH BUTTON ============ */}
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-white/10">
+            <button
+              type="button"
+              onClick={getUserLocation}
+              disabled={isGettingLocation}
+              className={`text-xs px-3 py-1.5 rounded-xl transition ${
+                showNearby
+                  ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                  : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"
+              }`}
+            >
+              {isGettingLocation ? (
+                <>
+                  <span className="animate-spin inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full mr-1.5"></span>
+                  Getting location...
+                </>
+              ) : showNearby ? (
+                "📍 Nearby mode ON"
+              ) : (
+                "📍 Show Nearby"
+              )}
+            </button>
+
+            {showNearby && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNearby(false);
+                  setUserLocation(null);
+                  setFilters((prev) => ({
+                    ...prev,
+                    nearby: "",
+                    sort_by: "newest",
+                  }));
+                  refetch();
+                }}
+                className="text-xs text-red-400 hover:text-red-300 transition"
+              >
+                ✕ Turn off nearby
+              </button>
+            )}
+
+            {hasLocation && showNearby && (
+              <span className="text-[10px] text-gray-500">
+                Showing listings near you
+              </span>
+            )}
+          </div>
+
+          {/* Similar Types Suggestions */}
+          {renderSuggestions()}
+
+          {/* Active Filters Summary */}
           {(filters.search ||
             filters.house_type ||
             filters.location ||
             filters.price_min ||
-            filters.price_max) && (
+            filters.price_max ||
+            showNearby) && (
             <div className="flex flex-col sm:flex-row justify-between items-center gap-2 border-t border-white/10 pt-3">
               <span className="text-xs text-gray-500">
                 {data?.total || 0} results found
+                {showNearby && " 📍 Nearby"}
+                {filters.house_type &&
+                  ` • ${HOUSE_TYPES.find((t) => t.value === filters.house_type)?.label}`}
+                {filters.location && ` • 📍 ${filters.location}`}
+                {filters.price_min && ` • From KSh ${filters.price_min}`}
+                {filters.price_max && ` • To KSh ${filters.price_max}`}
               </span>
               <button
                 type="button"
@@ -286,33 +446,136 @@ export default function HomePage() {
               post your own listing!
             </Link>
           </p>
+          {showNearby && (
+            <button
+              onClick={() => {
+                setShowNearby(false);
+                setUserLocation(null);
+                setFilters((prev) => ({
+                  ...prev,
+                  nearby: "",
+                  sort_by: "newest",
+                }));
+                refetch();
+              }}
+              className="btn-outline text-sm mt-4"
+            >
+              Turn off nearby search
+            </button>
+          )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {listings.map((listing) => {
-            const expiry = getExpiryStatus(
-              listing.expiry_status,
-              listing.expiry_status_text,
-            );
-            const isExpired =
-              listing.is_expired || listing.expiry_status === "expired";
-            const hasBadge = listing.author?.badge;
+        <>
+          {/* ============ SMART SEARCH RESULT INFO ============ */}
+          {filters.house_type && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 bg-black/30 p-2 rounded-xl border border-white/5">
+              <span>🔍 Showing:</span>
+              <span className="text-white font-medium">
+                {HOUSE_TYPES.find((t) => t.value === filters.house_type)?.label}
+              </span>
+              {getSimilarTypes(filters.house_type).length > 0 && (
+                <>
+                  <span>+ similar:</span>
+                  {getSimilarTypes(filters.house_type).map((type) => (
+                    <span key={type} className="text-gray-300">
+                      {HOUSE_TYPES.find((t) => t.value === type)?.label}
+                    </span>
+                  ))}
+                </>
+              )}
+              {showNearby && (
+                <span className="text-blue-400 ml-2">📍 Nearby</span>
+              )}
+            </div>
+          )}
 
-            return (
-              <Link key={listing.id} to={`/listing/${listing.id}`}>
-                <div className={`card group ${isExpired ? "opacity-60" : ""}`}>
-                  <div className="aspect-[4/3] bg-[#0a0a0a] overflow-hidden relative">
-                    {listing.cover_image ? (
-                      <img
-                        src={listing.cover_image}
-                        alt={listing.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+            {listings.map((listing) => {
+              const expiry = getExpiryStatus(
+                listing.expiry_status,
+                listing.expiry_status_text,
+              );
+              const isExpired =
+                listing.is_expired || listing.expiry_status === "expired";
+              const hasBadge = listing.author?.badge;
+              const isSimilar =
+                filters.house_type &&
+                listing.house_type !== filters.house_type &&
+                getSimilarTypes(filters.house_type).includes(
+                  listing.house_type,
+                );
+
+              return (
+                <Link key={listing.id} to={`/listing/${listing.id}`}>
+                  <div
+                    className={`card group ${isExpired ? "opacity-60" : ""}`}
+                  >
+                    <div className="aspect-[4/3] bg-[#0a0a0a] overflow-hidden relative">
+                      {listing.cover_image ? (
+                        <img
+                          src={listing.cover_image}
+                          alt={listing.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <svg
+                            className="w-12 h-12 sm:w-16 sm:h-16 text-gray-700"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.5}
+                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </div>
+                      )}
+
+                      {/* Status Badge on Image */}
+                      {listing.is_taken ? (
+                        <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
+                          Taken
+                        </span>
+                      ) : isExpired ? (
+                        <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
+                          Expired
+                        </span>
+                      ) : (
+                        <span
+                          className={`absolute top-2 right-2 ${expiry.bg} ${expiry.color} text-[10px] px-2 py-0.5 rounded-full border border-current/20`}
+                        >
+                          {expiry.label}
+                        </span>
+                      )}
+
+                      {/* Credibility Badge on Image */}
+                      {hasBadge && (
+                        <span className="absolute top-2 left-2 text-xs">
+                          {getCredibilityBadge(hasBadge)}
+                        </span>
+                      )}
+
+                      {/* Similar Type Badge */}
+                      {isSimilar && (
+                        <span className="absolute bottom-2 left-2 bg-blue-500/80 text-white text-[8px] px-2 py-0.5 rounded-full">
+                          Similar
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-3 sm:p-4">
+                      <h3 className="font-semibold text-sm sm:text-base mb-0.5 line-clamp-1 text-white group-hover:text-blue-400 transition">
+                        {listing.title}
+                      </h3>
+
+                      <p className="text-gray-500 text-xs sm:text-sm mb-1.5 flex items-center gap-1">
                         <svg
-                          className="w-12 h-12 sm:w-16 sm:h-16 text-gray-700"
+                          className="w-3 h-3 sm:w-4 sm:h-4"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -320,95 +583,49 @@ export default function HomePage() {
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            strokeWidth={2}
+                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                           />
                         </svg>
-                      </div>
-                    )}
-
-                    {/* Status Badge on Image */}
-                    {listing.is_taken ? (
-                      <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
-                        Taken
-                      </span>
-                    ) : isExpired ? (
-                      <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
-                        Expired
-                      </span>
-                    ) : (
-                      <span
-                        className={`absolute top-2 right-2 ${expiry.bg} ${expiry.color} text-[10px] px-2 py-0.5 rounded-full border border-current/20`}
-                      >
-                        {expiry.label}
-                      </span>
-                    )}
-
-                    {/* Credibility Badge on Image */}
-                    {hasBadge && (
-                      <span className="absolute top-2 left-2 text-xs">
-                        {getCredibilityBadge(hasBadge)}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="p-3 sm:p-4">
-                    <h3 className="font-semibold text-sm sm:text-base mb-0.5 line-clamp-1 text-white group-hover:text-blue-400 transition">
-                      {listing.title}
-                    </h3>
-
-                    <p className="text-gray-500 text-xs sm:text-sm mb-1.5 flex items-center gap-1">
-                      <svg
-                        className="w-3 h-3 sm:w-4 sm:h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                      </svg>
-                      {listing.location}
-                    </p>
-
-                    <div className="flex items-center justify-between">
-                      <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-base sm:text-xl">
-                        KSh {listing.price?.toLocaleString()}
+                        {listing.location}
                       </p>
-                      {listing.true_monthly_cost &&
-                        listing.true_monthly_cost !== listing.price && (
-                          <p className="text-[10px] text-gray-500">
-                            +
-                            {listing.service_charge
-                              ? `KSh ${listing.service_charge}`
-                              : ""}
+
+                      <div className="flex items-center justify-between">
+                        <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-base sm:text-xl">
+                          KSh {listing.price?.toLocaleString()}
+                        </p>
+                        {listing.true_monthly_cost &&
+                          listing.true_monthly_cost !== listing.price && (
+                            <p className="text-[10px] text-gray-500">
+                              +
+                              {listing.service_charge
+                                ? `KSh ${listing.service_charge}`
+                                : ""}
+                            </p>
+                          )}
+                      </div>
+
+                      {/* Days remaining */}
+                      {!isExpired &&
+                        !listing.is_taken &&
+                        listing.days_remaining !== undefined && (
+                          <p className={`text-[10px] mt-1 ${expiry.color}`}>
+                            {listing.days_remaining} days remaining
                           </p>
                         )}
                     </div>
-
-                    {/* Days remaining (if not expired) */}
-                    {!isExpired &&
-                      !listing.is_taken &&
-                      listing.days_remaining !== undefined && (
-                        <p className={`text-[10px] mt-1 ${expiry.color}`}>
-                          {listing.days_remaining} days remaining
-                        </p>
-                      )}
                   </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+                </Link>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
