@@ -85,6 +85,7 @@ export default function CreateListingPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const cameraInputRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
 
   const [listingId, setListingId] = useState(null);
   const [isRollingBack, setIsRollingBack] = useState(false);
@@ -129,6 +130,50 @@ export default function CreateListingPage() {
   const [imagePreviews, setImagePreviews] = useState([]);
   const [locationStatus, setLocationStatus] = useState(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+
+  // ============ AUTO-SEARCH LOCATION ON MAP ============
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    const searchLocation = async () => {
+      // Only search if location has at least 3 characters
+      if (!formData.location || formData.location.length < 3) return;
+
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.location)}, Kenya&limit=1`,
+        );
+        const data = await response.json();
+
+        if (data && data.length > 0) {
+          const { lat, lon } = data[0];
+          const latNum = parseFloat(lat);
+          const lonNum = parseFloat(lon);
+
+          setPinLocation({ latitude: latNum, longitude: lonNum });
+          setFormData((prev) => ({
+            ...prev,
+            pin_latitude: latNum.toString(),
+            pin_longitude: lonNum.toString(),
+          }));
+        }
+      } catch (error) {
+        // Silent fail - user can still drop pin manually
+        console.debug("Location search:", error);
+      }
+    };
+
+    // Debounce: wait 1 second after user stops typing
+    searchTimeoutRef.current = setTimeout(searchLocation, 1000);
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [formData.location]);
 
   // ============ DELETE LISTING (ROLLBACK) ============
   const deleteMutation = useMutation({
@@ -181,7 +226,7 @@ export default function CreateListingPage() {
 
       if (rejectedCount > 0 && uploadedCount > 0) {
         // Some images rejected, some uploaded - show warning but keep listing
-        toast.warning(
+        toast.error(
           `⚠️ ${rejectedCount} image(s) were rejected. ${uploadedCount} uploaded successfully.`,
         );
         // Show detailed rejection reasons
@@ -193,7 +238,7 @@ export default function CreateListingPage() {
       // Show location status
       if (data.location_warnings && data.location_warnings.length > 0) {
         const warning = data.location_warnings[0];
-        toast.warning(`⚠️ ${warning.warning}`);
+        toast.error(`⚠️ ${warning.warning}`);
       }
       if (data.location_verified) {
         toast.success("📍 Location verified!");
@@ -355,7 +400,7 @@ export default function CreateListingPage() {
         message:
           "⚠️ Could not get GPS location. Using pin location if available.",
       });
-      toast.warning("⚠️ GPS not available. Using pin if set.", {
+      toast.error("⚠️ GPS not available. Using pin if set.", {
         id: loadingToastId,
       });
     }
@@ -460,6 +505,9 @@ export default function CreateListingPage() {
                 className="input"
                 required
               />
+              <p className="text-[10px] text-gray-500 mt-1">
+                💡 The map below will automatically search for this location
+              </p>
             </div>
 
             {/* Hidden GPS fields */}

@@ -92,6 +92,7 @@ export default function EditListingPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const cameraInputRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
 
   const [formData, setFormData] = useState({
     // Existing fields
@@ -103,7 +104,7 @@ export default function EditListingPage() {
     contact_phone: "",
     latitude: "",
     longitude: "",
-    // ============ NEW: Pin Location Fields ============
+    // ============ Pin Location Fields ============
     pin_latitude: "",
     pin_longitude: "",
     // ============ Layer 1 Fields ============
@@ -137,6 +138,50 @@ export default function EditListingPage() {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [pinLocation, setPinLocation] = useState(null);
+
+  // ============ AUTO-SEARCH LOCATION ON MAP ============
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    const searchLocation = async () => {
+      // Only search if location has at least 3 characters
+      if (!formData.location || formData.location.length < 3) return;
+
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.location)}, Kenya&limit=1`,
+        );
+        const data = await response.json();
+
+        if (data && data.length > 0) {
+          const { lat, lon } = data[0];
+          const latNum = parseFloat(lat);
+          const lonNum = parseFloat(lon);
+
+          setPinLocation({ latitude: latNum, longitude: lonNum });
+          setFormData((prev) => ({
+            ...prev,
+            pin_latitude: latNum.toString(),
+            pin_longitude: lonNum.toString(),
+          }));
+        }
+      } catch (error) {
+        // Silent fail - user can still drop pin manually
+        console.debug("Location search:", error);
+      }
+    };
+
+    // Debounce: wait 1 second after user stops typing
+    searchTimeoutRef.current = setTimeout(searchLocation, 1000);
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [formData.location]);
 
   // Fetch existing listing data
   const {
@@ -233,7 +278,7 @@ export default function EditListingPage() {
           }
 
           if (rejectedCount > 0 && uploadedCount > 0) {
-            toast.warning(
+            toast.error(
               `⚠️ ${rejectedCount} image(s) rejected. ${uploadedCount} uploaded successfully.`,
             );
             result.rejected_files.forEach((rejected) => {
@@ -243,7 +288,7 @@ export default function EditListingPage() {
 
           if (result.location_warnings && result.location_warnings.length > 0) {
             const warning = result.location_warnings[0];
-            toast.warning(`⚠️ ${warning.warning}`);
+            toast.error(`⚠️ ${warning.warning}`);
           }
           if (result.location_verified) {
             toast.success("📍 Location verified!");
@@ -340,10 +385,15 @@ export default function EditListingPage() {
   };
 
   // ============ CAMERA CAPTURE ============
-  const handleCameraCapture = (e) => {
+  const handleCameraCapture = async (e) => {
+    // Prevent any default behavior that might cause page reload
+    e.preventDefault();
+    e.stopPropagation();
+
     const file = e.target.files[0];
     if (!file) {
       console.log("No file selected");
+      e.target.value = "";
       return;
     }
 
@@ -361,62 +411,46 @@ export default function EditListingPage() {
       return;
     }
 
+    // Show loading state
+    const loadingToastId = toast.loading("Processing photo...");
+
     // GPS with fallback
-    setIsGettingLocation(true);
-    if (navigator.geolocation) {
-      const locationPromise = new Promise((resolve) => {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            resolve({
-              success: true,
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            });
-          },
-          (error) => {
-            console.warn("⚠️ GPS error:", error.message);
-            resolve({ success: false, error: error.message });
-          },
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 },
-        );
+    let deviceLat = null;
+    let deviceLon = null;
+
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 30000,
+        });
       });
 
-      const timeoutPromise = new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({ success: false, error: "GPS timeout" });
-        }, 6000);
-      });
+      deviceLat = position.coords.latitude;
+      deviceLon = position.coords.longitude;
 
-      Promise.race([locationPromise, timeoutPromise]).then((result) => {
-        if (result.success) {
-          const { latitude, longitude } = result;
-          console.log("📍 GPS detected:", latitude, longitude);
-          setFormData((prev) => ({
-            ...prev,
-            latitude: latitude.toString(),
-            longitude: longitude.toString(),
-          }));
-          setLocationStatus({
-            success: true,
-            message: `📍 Location detected: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-          });
-          toast.success("📍 Location detected!");
-        } else {
-          console.warn("⚠️ Could not get GPS:", result.error);
-          setLocationStatus({
-            success: false,
-            message:
-              "⚠️ Could not get GPS location. Location verification may be skipped.",
-          });
-          toast.warning("⚠️ GPS not available. Location verification skipped.");
-        }
-        setIsGettingLocation(false);
+      console.log("📍 GPS detected:", deviceLat, deviceLon);
+      setFormData((prev) => ({
+        ...prev,
+        latitude: deviceLat.toString(),
+        longitude: deviceLon.toString(),
+      }));
+      setLocationStatus({
+        success: true,
+        message: `📍 Location detected: ${deviceLat.toFixed(6)}, ${deviceLon.toFixed(6)}`,
       });
-    } else {
-      toast.warning(
-        "📍 Geolocation not supported. Location verification skipped.",
-      );
-      setIsGettingLocation(false);
+      toast.success("📍 Location detected!", { id: loadingToastId });
+    } catch (error) {
+      console.warn("⚠️ GPS error:", error.message);
+      setLocationStatus({
+        success: false,
+        message:
+          "⚠️ Could not get GPS location. Location verification may be skipped.",
+      });
+      toast.error("⚠️ GPS not available. Location verification skipped.", {
+        id: loadingToastId,
+      });
     }
 
     setNewImages([...newImages, file]);
@@ -427,7 +461,7 @@ export default function EditListingPage() {
     };
     setNewImagePreviews([...newImagePreviews, preview]);
 
-    toast.success("📸 Photo captured!");
+    toast.success("📸 Photo captured!", { id: loadingToastId });
     e.target.value = "";
   };
 
@@ -519,6 +553,9 @@ export default function EditListingPage() {
                 className="input"
                 required
               />
+              <p className="text-[10px] text-gray-500 mt-1">
+                💡 The map below will automatically search for this location
+              </p>
             </div>
 
             {/* Hidden GPS fields */}
