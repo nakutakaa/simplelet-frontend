@@ -289,84 +289,78 @@ export default function CreateListingPage() {
     createMutation.mutate(cleanedData);
   };
 
-  // ============ CAMERA CAPTURE ============
-  const handleCameraCapture = (e) => {
+  // ============ CAMERA CAPTURE - FIXED ============
+  const handleCameraCapture = async (e) => {
+    // Prevent any default behavior that might cause page reload
+    e.preventDefault();
+    e.stopPropagation();
+
     const file = e.target.files[0];
     if (!file) {
       console.log("No file selected");
+      e.target.value = "";
       return;
     }
 
     console.log("📸 File captured:", file.name, file.type, file.size);
 
+    // Validate file type
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file");
       e.target.value = "";
       return;
     }
 
+    // Validate file size
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Image exceeds 10MB limit");
       e.target.value = "";
       return;
     }
 
-    // GPS with fallback
-    setIsGettingLocation(true);
-    if (navigator.geolocation) {
-      const locationPromise = new Promise((resolve) => {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            resolve({
-              success: true,
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            });
-          },
-          (error) => {
-            console.warn("⚠️ GPS error:", error.message);
-            resolve({ success: false, error: error.message });
-          },
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 },
-        );
+    // Show loading state
+    const loadingToastId = toast.loading("Processing photo...");
+
+    // Try to get GPS from device
+    let deviceLat = null;
+    let deviceLon = null;
+
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 30000,
+        });
       });
 
-      const timeoutPromise = new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({ success: false, error: "GPS timeout" });
-        }, 6000);
-      });
+      deviceLat = position.coords.latitude;
+      deviceLon = position.coords.longitude;
 
-      Promise.race([locationPromise, timeoutPromise]).then((result) => {
-        if (result.success) {
-          const { latitude, longitude } = result;
-          console.log("📍 GPS detected:", latitude, longitude);
-          setFormData((prev) => ({
-            ...prev,
-            latitude: latitude.toString(),
-            longitude: longitude.toString(),
-          }));
-          setLocationStatus({
-            success: true,
-            message: `📍 Location detected: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-          });
-          toast.success("📍 Location detected!");
-        } else {
-          console.warn("⚠️ Could not get GPS:", result.error);
-          setLocationStatus({
-            success: false,
-            message:
-              "⚠️ Could not get GPS location. Using pin location if available.",
-          });
-          toast.warning("⚠️ GPS not available. Using pin location if set.");
-        }
-        setIsGettingLocation(false);
+      console.log("📍 GPS detected:", deviceLat, deviceLon);
+      setFormData((prev) => ({
+        ...prev,
+        latitude: deviceLat.toString(),
+        longitude: deviceLon.toString(),
+      }));
+      setLocationStatus({
+        success: true,
+        message: `📍 Location detected: ${deviceLat.toFixed(6)}, ${deviceLon.toFixed(6)}`,
       });
-    } else {
-      toast.warning("📍 Geolocation not supported. Using pin location if set.");
-      setIsGettingLocation(false);
+      toast.success("📍 Location detected!", { id: loadingToastId });
+    } catch (error) {
+      console.warn("⚠️ GPS error:", error.message);
+      setLocationStatus({
+        success: false,
+        message:
+          "⚠️ Could not get GPS location. Using pin location if available.",
+      });
+      toast.warning("⚠️ GPS not available. Using pin if set.", {
+        id: loadingToastId,
+      });
     }
 
+    // Add the image to state
     setImages((prev) => [...prev, file]);
     const preview = {
       url: URL.createObjectURL(file),
@@ -375,7 +369,9 @@ export default function CreateListingPage() {
     };
     setImagePreviews((prev) => [...prev, preview]);
 
-    toast.success("📸 Photo captured!");
+    toast.success("📸 Photo captured!", { id: loadingToastId });
+
+    // Reset the input so the same file can be captured again
     e.target.value = "";
   };
 

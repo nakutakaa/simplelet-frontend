@@ -1,5 +1,5 @@
 // src/pages/DashboardPage.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -40,29 +40,65 @@ export default function DashboardPage() {
   const [deletingId, setDeletingId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [confirmingId, setConfirmingId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredListings, setFilteredListings] = useState([]);
 
-  // Fetch listings
+  // Fetch listings with auto-refresh settings
   const {
     data: listingsData,
     isLoading: listingsLoading,
     error: listingsError,
+    refetch: refetchListings,
   } = useQuery({
     queryKey: ["myListings"],
     queryFn: fetchMyListings,
+    // REFRESH WHEN PAGE BECOMES VISIBLE
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    // Auto-refresh every 30 seconds
+    refetchInterval: 30000,
+    // Don't refetch on background if inactive
+    refetchIntervalInBackground: false,
+    // Stale time: 5 seconds
+    staleTime: 5000,
   });
 
   // Fetch user profile
   const { data: userData, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
     queryFn: fetchUserProfile,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    staleTime: 5000,
   });
+
+  // Filter listings based on search query
+  useEffect(() => {
+    if (listingsData?.listings) {
+      const filtered = listingsData.listings.filter(
+        (listing) =>
+          listing.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          listing.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          listing.house_type
+            ?.toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          listing.house_type_display
+            ?.toLowerCase()
+            .includes(searchQuery.toLowerCase()),
+      );
+      setFilteredListings(filtered);
+    }
+  }, [listingsData, searchQuery]);
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: deleteListing,
     onSuccess: () => {
       toast.success("Listing deleted successfully");
+      // Force refetch to update the list
       queryClient.invalidateQueries(["myListings"]);
+      refetchListings();
     },
     onError: (error) => {
       toast.error(error.response?.data?.error || "Failed to delete");
@@ -75,6 +111,7 @@ export default function DashboardPage() {
     onSuccess: (data) => {
       toast.success(data.message);
       queryClient.invalidateQueries(["myListings"]);
+      refetchListings();
     },
     onError: (error) => {
       toast.error(error.response?.data?.error || "Failed to update");
@@ -87,6 +124,7 @@ export default function DashboardPage() {
     onSuccess: (data) => {
       toast.success(data.message || "Listing renewed successfully!");
       queryClient.invalidateQueries(["myListings"]);
+      refetchListings();
     },
     onError: (error) => {
       toast.error(error.response?.data?.error || "Failed to confirm listing");
@@ -144,6 +182,14 @@ export default function DashboardPage() {
     );
   };
 
+  // Manual refresh handler
+  const handleManualRefresh = () => {
+    toast.loading("Refreshing...", { id: "refresh" });
+    refetchListings().then(() => {
+      toast.success("Dashboard updated!", { id: "refresh" });
+    });
+  };
+
   if (listingsLoading || userLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -156,12 +202,19 @@ export default function DashboardPage() {
     return (
       <div className="text-center py-12">
         <p className="text-red-400">Failed to load your listings</p>
+        <button
+          onClick={() => refetchListings()}
+          className="btn-primary mt-4 text-sm"
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
   const listings = listingsData?.listings || [];
   const user = userData || {};
+  const displayListings = searchQuery ? filteredListings : listings;
 
   // Calculate stats
   const activeListings = listings.filter(
@@ -186,9 +239,51 @@ export default function DashboardPage() {
             Welcome back, {user.name || "User"}!
           </p>
         </div>
-        <Link to="/create-listing" className="btn-primary text-sm sm:text-base">
-          + Post New Listing
-        </Link>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <div className="flex gap-2 w-full sm:w-auto">
+            <input
+              type="text"
+              placeholder="🔍 Search your listings..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 sm:w-52 input text-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="text-xs text-gray-400 hover:text-white transition px-2"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          <button
+            onClick={handleManualRefresh}
+            className="bg-white/5 hover:bg-white/10 text-gray-300 px-3 py-2 rounded-xl border border-white/10 hover:border-blue-500/30 transition-all duration-300 text-sm flex items-center gap-1"
+            title="Refresh dashboard"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            Refresh
+          </button>
+          <Link
+            to="/create-listing"
+            className="btn-primary text-sm sm:text-base whitespace-nowrap"
+          >
+            + Post New Listing
+          </Link>
+        </div>
       </div>
 
       {/* User Credibility Badge */}
@@ -242,8 +337,15 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Search Results Info */}
+      {searchQuery && (
+        <div className="mb-4 text-sm text-gray-400">
+          Found {displayListings.length} listing(s) matching "{searchQuery}"
+        </div>
+      )}
+
       {/* Listings Grid */}
-      {listings.length === 0 ? (
+      {displayListings.length === 0 ? (
         <div className="text-center py-12 sm:py-16 bg-[#0a0a0a] rounded-2xl border border-white/10">
           <svg
             className="w-16 h-16 text-gray-600 mx-auto mb-4"
@@ -259,15 +361,27 @@ export default function DashboardPage() {
             />
           </svg>
           <p className="text-gray-400 mb-4">
-            You haven't posted any listings yet
+            {searchQuery
+              ? `No listings found matching "${searchQuery}"`
+              : "You haven't posted any listings yet"}
           </p>
-          <Link to="/create-listing" className="btn-primary">
-            Post Your First Listing
-          </Link>
+          {!searchQuery && (
+            <Link to="/create-listing" className="btn-primary">
+              Post Your First Listing
+            </Link>
+          )}
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="btn-outline text-sm"
+            >
+              Clear Search
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {listings.map((listing) => {
+          {displayListings.map((listing) => {
             const isExpired = listing.is_expired || !listing.is_active;
             const status = listing.expiry_status || "active";
             const statusText = listing.expiry_status_text || "Active";
@@ -412,7 +526,7 @@ export default function DashboardPage() {
                       Edit
                     </Link>
 
-                    {/* Confirm/Renew Button - Show for active listings needing confirmation */}
+                    {/* Confirm/Renew Button */}
                     {!isExpired && !listing.is_taken && (
                       <button
                         onClick={() => handleConfirm(listing.id)}

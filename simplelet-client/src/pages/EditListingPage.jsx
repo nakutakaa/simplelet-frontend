@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
 import { XMarkIcon, CameraIcon } from "@heroicons/react/24/outline";
+import MapPicker from "../components/MapPicker";
 
 // House types
 const HOUSE_TYPES = [
@@ -102,6 +103,9 @@ export default function EditListingPage() {
     contact_phone: "",
     latitude: "",
     longitude: "",
+    // ============ NEW: Pin Location Fields ============
+    pin_latitude: "",
+    pin_longitude: "",
     // ============ Layer 1 Fields ============
     service_charge: "",
     trash_fee: "",
@@ -132,6 +136,7 @@ export default function EditListingPage() {
   const [locationStatus, setLocationStatus] = useState(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [pinLocation, setPinLocation] = useState(null);
 
   // Fetch existing listing data
   const {
@@ -146,6 +151,14 @@ export default function EditListingPage() {
   // Populate form when data loads
   useEffect(() => {
     if (listing) {
+      // Set pin location if exists
+      if (listing.pin_latitude && listing.pin_longitude) {
+        setPinLocation({
+          latitude: listing.pin_latitude,
+          longitude: listing.pin_longitude,
+        });
+      }
+
       setFormData({
         title: listing.title || "",
         house_type: listing.house_type || "studio",
@@ -155,6 +168,8 @@ export default function EditListingPage() {
         contact_phone: listing.contact_phone || "",
         latitude: listing.latitude || "",
         longitude: listing.longitude || "",
+        pin_latitude: listing.pin_latitude || "",
+        pin_longitude: listing.pin_longitude || "",
         service_charge: listing.service_charge || "",
         trash_fee: listing.trash_fee || "",
         water_source: listing.water_source || "",
@@ -260,6 +275,18 @@ export default function EditListingPage() {
     }));
   };
 
+  // Handle pin drop from map
+  const handlePinDrop = (location) => {
+    console.log("📍 Pin dropped:", location);
+    setPinLocation(location);
+    setFormData((prev) => ({
+      ...prev,
+      pin_latitude: location.latitude.toString(),
+      pin_longitude: location.longitude.toString(),
+    }));
+    toast.success("📍 Pin updated on map!");
+  };
+
   // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -294,6 +321,8 @@ export default function EditListingPage() {
       "gym_distance",
       "latitude",
       "longitude",
+      "pin_latitude",
+      "pin_longitude",
     ];
     numericFields.forEach((field) => {
       if (cleanedData[field] !== null && cleanedData[field] !== undefined) {
@@ -552,6 +581,54 @@ export default function EditListingPage() {
                 className="input"
               />
             </div>
+          </div>
+
+          {/* ============ MAP PICKER ============ */}
+          <div className="border-b border-white/10 pb-6">
+            <h2 className="text-sm font-semibold text-gray-300 mb-4">
+              📍 Property Location on Map
+            </h2>
+            <p className="text-xs text-gray-400 mb-3">
+              Click on the map to update the property location pin.
+              {pinLocation && (
+                <span className="text-green-400 ml-1">
+                  ✅ Current pin: {pinLocation.latitude.toFixed(6)},{" "}
+                  {pinLocation.longitude.toFixed(6)}
+                </span>
+              )}
+            </p>
+            <MapPicker
+              onLocationSelect={handlePinDrop}
+              initialCenter={
+                pinLocation
+                  ? [pinLocation.latitude, pinLocation.longitude]
+                  : [
+                      listing.latitude || -1.286389,
+                      listing.longitude || 36.817223,
+                    ]
+              }
+              initialZoom={15}
+              height="350px"
+              setPinLocation={setPinLocation}
+              isVerified={!!pinLocation}
+              showSearch={true}
+            />
+            {pinLocation && (
+              <div className="mt-2 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <p className="text-xs text-green-400">
+                  ✅ Pin updated at: {pinLocation.latitude.toFixed(6)},{" "}
+                  {pinLocation.longitude.toFixed(6)}
+                </p>
+              </div>
+            )}
+            {!pinLocation && (
+              <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="text-xs text-yellow-400">
+                  ⚠️ No pin set. Drop a pin on the map to mark the property
+                  location.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* ============ UTILITY & FEE BREAKDOWN ============ */}
@@ -949,9 +1026,11 @@ export default function EditListingPage() {
             <p className="text-sm text-blue-300 flex items-start gap-2">
               <span className="text-lg">📍</span>
               <span>
-                <strong>Location Verification:</strong> When you take a photo
-                with your camera, the GPS location is embedded in the photo. The
-                system will verify you are at the property location.
+                <strong>Location Verification:</strong> Drop a pin on the map to
+                mark the property location. When you take a photo with your
+                camera, the GPS location is embedded in the photo. The system
+                will verify you are at the property location. Photos without GPS
+                data will use the pin location as fallback.
               </span>
             </p>
           </div>
