@@ -9,6 +9,32 @@ import CommentItem from "../components/CommentItem";
 import ReviewSection from "../components/ReviewSection";
 import WhatsAppButton from "../components/WhatsAppButton";
 import CredibilityBadge from "../components/CredibilityBadge";
+import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+
+// Fix for default marker icons in Leaflet with React
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+});
+
+// Custom green marker for verified location
+const verifiedPinIcon = new L.Icon({
+  iconUrl:
+    "https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
 
 // Helper function to get optimized Cloudinary URL
 const getOptimizedImageUrl = (url, width = 800, height = 600) => {
@@ -189,6 +215,28 @@ export default function ListingDetailPage() {
     toast.success("Review submitted! Thank you for your feedback.");
   };
 
+  // Determine if we have location data to show on map
+  const hasLocation =
+    (listing?.latitude && listing?.longitude) ||
+    (listing?.pin_latitude && listing?.pin_longitude);
+
+  // Get best location for map
+  const getMapLocation = () => {
+    if (listing?.pin_latitude && listing?.pin_longitude) {
+      return {
+        lat: listing.pin_latitude,
+        lng: listing.pin_longitude,
+        source: "pin",
+      };
+    }
+    if (listing?.latitude && listing?.longitude) {
+      return { lat: listing.latitude, lng: listing.longitude, source: "gps" };
+    }
+    return null;
+  };
+
+  const mapLocation = getMapLocation();
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -214,6 +262,7 @@ export default function ListingDetailPage() {
   const expiryStatus = listing.expiry_status || "active";
   const expiryStatusText = listing.expiry_status_text || "Active";
   const daysRemaining = listing.days_remaining;
+  const isLocationVerified = listing.location_verified || listing.pin_verified;
 
   // Helper to render feature check
   const renderFeature = (label, value) => {
@@ -362,6 +411,9 @@ export default function ListingDetailPage() {
             />
           </svg>
           <span>{listing.location}</span>
+          {isLocationVerified && (
+            <span className="text-[10px] text-green-400 ml-1">✅ Verified</span>
+          )}
         </div>
 
         {/* Author Credibility Badge */}
@@ -645,6 +697,81 @@ export default function ListingDetailPage() {
                 ✅ Food delivery available (Bolt/Uber Eats)
               </p>
             )}
+          </div>
+        )}
+
+        {/* ============ NEW: MAP DISPLAY ============ */}
+        {hasLocation && mapLocation && (
+          <div className="border-t border-white/10 pt-4 mb-4">
+            <h3 className="text-sm font-semibold text-gray-300 mb-2">
+              📍 Property Location
+              {isLocationVerified && (
+                <span className="text-[10px] text-green-400 ml-2">
+                  ✅ Verified
+                </span>
+              )}
+            </h3>
+            <div className="rounded-xl overflow-hidden border border-white/10 h-[250px]">
+              <MapContainer
+                center={[mapLocation.lat, mapLocation.lng]}
+                zoom={15}
+                style={{ height: "100%", width: "100%" }}
+                zoomControl={true}
+                attributionControl={true}
+              >
+                <TileLayer
+                  attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <Marker
+                  position={[mapLocation.lat, mapLocation.lng]}
+                  icon={isLocationVerified ? verifiedPinIcon : undefined}
+                >
+                  <Popup>
+                    <div className="text-sm">
+                      <p className="font-semibold">{listing.title}</p>
+                      <p className="text-gray-500 text-xs">
+                        {listing.location}
+                      </p>
+                      {isLocationVerified && (
+                        <p className="text-green-400 text-xs mt-1">
+                          ✅ Location Verified
+                        </p>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+                <Circle
+                  center={[mapLocation.lat, mapLocation.lng]}
+                  radius={500}
+                  pathOptions={{
+                    color: isLocationVerified ? "green" : "blue",
+                    fillOpacity: 0.1,
+                  }}
+                />
+              </MapContainer>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <span className="text-[10px] text-gray-500">
+                📍{" "}
+                {mapLocation.source === "pin" ? "Pin location" : "GPS location"}
+              </span>
+              {listing.matatu_distance && (
+                <span className="text-[10px] text-gray-500">
+                  🚌 Matatu: {listing.matatu_distance}m
+                </span>
+              )}
+              {listing.supermarket_distance && (
+                <span className="text-[10px] text-gray-500">
+                  🛒 Supermarket: {listing.supermarket_distance}m
+                </span>
+              )}
+              {listing.gym_distance && (
+                <span className="text-[10px] text-gray-500">
+                  💪 Gym: {listing.gym_distance}m
+                </span>
+              )}
+            </div>
           </div>
         )}
 
