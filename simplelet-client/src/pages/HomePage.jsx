@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import API from "../services/api";
 import toast from "react-hot-toast";
+import SafetyTip from "../components/SafetyTip";
 
 // House types for filter dropdown
 const HOUSE_TYPES = [
@@ -241,6 +242,9 @@ export default function HomePage() {
     <div className="space-y-4 sm:space-y-6">
       {/* Search and Filter Bar */}
       <div className="bg-black rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
+        {/* ============ SAFETY TIP ============ */}
+        <SafetyTip page="search" className="mb-4" />
+
         <form onSubmit={handleSearchSubmit} className="space-y-3 sm:space-y-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <input
@@ -341,6 +345,9 @@ export default function HomePage() {
 
           {/* ============ NEARBY SEARCH BUTTON ============ */}
           <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-white/10">
+            {/* ============ SAFETY TIP ============ */}
+            <SafetyTip page="price" className="w-full mb-2" />
+
             <button
               type="button"
               onClick={getUserLocation}

@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import API from "../services/api";
 import { XMarkIcon, PhotoIcon, CameraIcon } from "@heroicons/react/24/outline";
 import MapPicker from "../components/MapPicker";
+import SafetyTip from "../components/SafetyTip";
 
 // House types from backend
 const HOUSE_TYPES = [
@@ -57,6 +58,59 @@ const BACKUP_POWER = [
   { value: "none", label: "None" },
 ];
 
+// ============ ERROR MESSAGES ============
+const getErrorMessage = (error, context = "listing") => {
+  const status = error.response?.status;
+  const data = error.response?.data;
+  const errorCode = data?.error_code || data?.error || "";
+
+  const errorMap = {
+    // Listing creation errors
+    house_type_required: "🏠 Please select a property type.",
+    location_required: "📍 Please enter the property location.",
+    invalid_house_type: "🏠 Invalid property type selected.",
+    invalid_price: "💰 Please enter a valid price.",
+    price_negative: "💰 Price cannot be negative.",
+    invalid_phone: "📱 Invalid phone number format.",
+    listing_creation_failed: "❌ Failed to create listing. Please try again.",
+
+    // Image upload errors
+    no_images: "📸 Please take at least one photo of the property.",
+    too_many_images: "📸 Maximum 10 images allowed.",
+    image_upload_failed: "❌ Failed to upload images. Please try again.",
+    image_rejected: "🚫 Some images were rejected. Check the reasons below.",
+    no_gps: "📍 No GPS data found. Please drop a pin on the map.",
+    location_mismatch: "📍 Photo location does not match the pin location.",
+    camera_only:
+      "📸 Please use your camera to take photos (no gallery uploads).",
+
+    // Network errors
+    network_error: "📡 Network error. Please check your connection.",
+    server_error: "⚠️ Server error. Please try again later.",
+    timeout: "⏳ Request timed out. Please try again.",
+  };
+
+  // Check for specific error codes first
+  if (errorCode && errorMap[errorCode]) {
+    return errorMap[errorCode];
+  }
+
+  // Check by HTTP status
+  if (status === 400) return "⚠️ Please check your information and try again.";
+  if (status === 401) return "🔒 Session expired. Please login again.";
+  if (status === 403)
+    return "🚫 You don't have permission to create a listing.";
+  if (status === 404) return "❌ Resource not found.";
+  if (status === 409) return "⚠️ This listing already exists.";
+  if (status === 429) return "⏳ Too many attempts. Please wait a few minutes.";
+  if (status === 500) return "⚠️ Server error. Please try again later.";
+  if (!error.response) return "📡 Network error. Please check your connection.";
+
+  return (
+    data?.message || data?.error || "❌ Something went wrong. Please try again."
+  );
+};
+
 // Create listing mutation
 const createListing = async (listingData) => {
   const { data } = await API.post("/listings", listingData);
@@ -91,7 +145,6 @@ export default function CreateListingPage() {
   const [isRollingBack, setIsRollingBack] = useState(false);
   const [pinLocation, setPinLocation] = useState(null);
   const [formData, setFormData] = useState({
-    // Existing fields
     title: "",
     house_type: "studio",
     location: "",
@@ -100,10 +153,8 @@ export default function CreateListingPage() {
     contact_phone: "",
     latitude: "",
     longitude: "",
-    // ============ NEW: Pin Location Fields ============
     pin_latitude: "",
     pin_longitude: "",
-    // ============ Layer 1 Fields ============
     service_charge: "",
     trash_fee: "",
     water_source: "",
@@ -130,16 +181,15 @@ export default function CreateListingPage() {
   const [imagePreviews, setImagePreviews] = useState([]);
   const [locationStatus, setLocationStatus] = useState(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
 
   // ============ AUTO-SEARCH LOCATION ON MAP ============
   useEffect(() => {
-    // Clear previous timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
     const searchLocation = async () => {
-      // Only search if location has at least 3 characters
       if (!formData.location || formData.location.length < 3) return;
 
       try {
@@ -161,12 +211,10 @@ export default function CreateListingPage() {
           }));
         }
       } catch (error) {
-        // Silent fail - user can still drop pin manually
         console.debug("Location search:", error);
       }
     };
 
-    // Debounce: wait 1 second after user stops typing
     searchTimeoutRef.current = setTimeout(searchLocation, 1000);
     return () => {
       if (searchTimeoutRef.current) {
@@ -198,13 +246,18 @@ export default function CreateListingPage() {
       if (images.length > 0) {
         uploadMutation.mutate({ listingId: data.id, images });
       } else {
-        toast.success("Listing created successfully!");
+        toast.success("🏠 Listing created successfully!");
         queryClient.invalidateQueries(["myListings"]);
         navigate("/dashboard");
       }
     },
     onError: (error) => {
-      toast.error(error.response?.data?.error || "Failed to create listing");
+      const errorMsg = getErrorMessage(error, "create");
+      toast.error(errorMsg);
+
+      if (error.response?.status === 401) {
+        navigate("/login");
+      }
     },
   });
 
@@ -212,33 +265,38 @@ export default function CreateListingPage() {
   const uploadMutation = useMutation({
     mutationFn: uploadImages,
     onSuccess: (data) => {
-      // Check if any images were rejected
       const rejectedCount = data.rejected_files?.length || 0;
       const uploadedCount = data.uploaded?.length || 0;
 
+      // All images rejected - rollback
       if (rejectedCount > 0 && uploadedCount === 0) {
-        // ALL images rejected - rollback listing
         toast.error("❌ All images were rejected. Rolling back listing...");
+
+        // Show rejection reasons
+        data.rejected_files.forEach((rejected) => {
+          toast.error(`❌ ${rejected.filename}: ${rejected.reason}`);
+        });
+
         setIsRollingBack(true);
         deleteMutation.mutate(listingId);
         return;
       }
 
+      // Some images rejected, some uploaded
       if (rejectedCount > 0 && uploadedCount > 0) {
-        // Some images rejected, some uploaded - show warning but keep listing
-        toast.error(
-          `⚠️ ${rejectedCount} image(s) were rejected. ${uploadedCount} uploaded successfully.`,
+        toast.warning(
+          `⚠️ ${rejectedCount} image(s) rejected. ${uploadedCount} uploaded.`,
         );
-        // Show detailed rejection reasons
         data.rejected_files.forEach((rejected) => {
           toast.error(`❌ ${rejected.filename}: ${rejected.reason}`);
         });
       }
 
       // Show location status
-      if (data.location_warnings && data.location_warnings.length > 0) {
-        const warning = data.location_warnings[0];
-        toast.error(`⚠️ ${warning.warning}`);
+      if (data.location_warnings?.length > 0) {
+        data.location_warnings.forEach((warning) => {
+          toast.warning(`⚠️ ${warning.warning}`);
+        });
       }
       if (data.location_verified) {
         toast.success("📍 Location verified!");
@@ -249,8 +307,7 @@ export default function CreateListingPage() {
       navigate("/dashboard");
     },
     onError: (error) => {
-      // Images failed to upload - rollback listing
-      const errorMsg = error.response?.data?.error || "Images upload failed";
+      const errorMsg = getErrorMessage(error, "upload");
       toast.error(`❌ ${errorMsg}. Rolling back listing...`);
       setIsRollingBack(true);
       deleteMutation.mutate(listingId);
@@ -264,36 +321,67 @@ export default function CreateListingPage() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+
+    // Clear validation error for this field
+    if (validationErrors[name]) {
+      setValidationErrors((prev) => ({ ...prev, [name]: null }));
+    }
   };
 
   // Handle pin drop from map
   const handlePinDrop = (location) => {
-    console.log("📍 Pin dropped:", location);
     setPinLocation(location);
     setFormData((prev) => ({
       ...prev,
       pin_latitude: location.latitude.toString(),
       pin_longitude: location.longitude.toString(),
     }));
+    setValidationErrors((prev) => ({ ...prev, pin_location: null }));
     toast.success("📍 Pin placed on map!");
+  };
+
+  // Validate form before submission
+  const validateForm = () => {
+    const errors = {};
+
+    if (!formData.house_type) {
+      errors.house_type = "🏠 Please select a property type.";
+    }
+
+    if (!formData.location || formData.location.length < 2) {
+      errors.location = "📍 Please enter a valid location.";
+    }
+
+    if (formData.price && isNaN(parseFloat(formData.price))) {
+      errors.price = "💰 Please enter a valid price.";
+    }
+
+    if (formData.price && parseFloat(formData.price) < 0) {
+      errors.price = "💰 Price cannot be negative.";
+    }
+
+    if (images.length === 0) {
+      errors.images = "📸 Please take at least one photo at the property.";
+    }
+
+    if (!pinLocation) {
+      errors.pin_location = "📍 Please drop a pin on the map.";
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!formData.house_type || !formData.location) {
-      toast.error("House type and location are required");
-      return;
-    }
-
-    if (formData.price && isNaN(parseFloat(formData.price))) {
-      toast.error("Price must be a number");
-      return;
-    }
-
-    if (images.length === 0) {
-      toast.error("Please take at least one photo at the property");
+    if (!validateForm()) {
+      // Show first error
+      const firstError = Object.values(validationErrors)[0];
+      if (firstError) {
+        toast.error(firstError);
+      }
       return;
     }
 
@@ -334,9 +422,8 @@ export default function CreateListingPage() {
     createMutation.mutate(cleanedData);
   };
 
-  // ============ CAMERA CAPTURE - FIXED ============
+  // ============ CAMERA CAPTURE ============
   const handleCameraCapture = async (e) => {
-    // Prevent any default behavior that might cause page reload
     e.preventDefault();
     e.stopPropagation();
 
@@ -349,24 +436,20 @@ export default function CreateListingPage() {
 
     console.log("📸 File captured:", file.name, file.type, file.size);
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file");
+      toast.error("📸 Please select an image file.");
       e.target.value = "";
       return;
     }
 
-    // Validate file size
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Image exceeds 10MB limit");
+      toast.error("📸 Image exceeds 10MB limit.");
       e.target.value = "";
       return;
     }
 
-    // Show loading state
     const loadingToastId = toast.loading("Processing photo...");
 
-    // Try to get GPS from device
     let deviceLat = null;
     let deviceLon = null;
 
@@ -400,12 +483,11 @@ export default function CreateListingPage() {
         message:
           "⚠️ Could not get GPS location. Using pin location if available.",
       });
-      toast.error("⚠️ GPS not available. Using pin if set.", {
+      toast.warning("⚠️ GPS not available. Using pin if set.", {
         id: loadingToastId,
       });
     }
 
-    // Add the image to state
     setImages((prev) => [...prev, file]);
     const preview = {
       url: URL.createObjectURL(file),
@@ -413,10 +495,9 @@ export default function CreateListingPage() {
       isCamera: true,
     };
     setImagePreviews((prev) => [...prev, preview]);
+    setValidationErrors((prev) => ({ ...prev, images: null }));
 
     toast.success("📸 Photo captured!", { id: loadingToastId });
-
-    // Reset the input so the same file can be captured again
     e.target.value = "";
   };
 
@@ -459,6 +540,8 @@ export default function CreateListingPage() {
               Basic Information
             </h2>
 
+            <SafetyTip page="create_listing" className="mb-4" />
+
             {/* House Type */}
             <div>
               <label className="label">Property Type *</label>
@@ -466,7 +549,7 @@ export default function CreateListingPage() {
                 name="house_type"
                 value={formData.house_type}
                 onChange={handleChange}
-                className="input"
+                className={`input ${validationErrors.house_type ? "border-red-500/50 focus:border-red-500" : ""}`}
                 required
               >
                 {HOUSE_TYPES.map((type) => (
@@ -475,6 +558,11 @@ export default function CreateListingPage() {
                   </option>
                 ))}
               </select>
+              {validationErrors.house_type && (
+                <p className="text-red-400 text-[10px] mt-1">
+                  {validationErrors.house_type}
+                </p>
+              )}
             </div>
 
             {/* Title */}
@@ -502,12 +590,17 @@ export default function CreateListingPage() {
                 value={formData.location}
                 onChange={handleChange}
                 placeholder="e.g., Kilimani, Nairobi"
-                className="input"
+                className={`input ${validationErrors.location ? "border-red-500/50 focus:border-red-500" : ""}`}
                 required
               />
               <p className="text-[10px] text-gray-500 mt-1">
                 💡 The map below will automatically search for this location
               </p>
+              {validationErrors.location && (
+                <p className="text-red-400 text-[10px] mt-1">
+                  {validationErrors.location}
+                </p>
+              )}
             </div>
 
             {/* Hidden GPS fields */}
@@ -554,11 +647,16 @@ export default function CreateListingPage() {
                 value={formData.price}
                 onChange={handleChange}
                 placeholder="e.g., 25000"
-                className="input"
+                className={`input ${validationErrors.price ? "border-red-500/50 focus:border-red-500" : ""}`}
               />
               <p className="text-[10px] text-gray-500 mt-1">
                 Leave blank if price is negotiable
               </p>
+              {validationErrors.price && (
+                <p className="text-red-400 text-[10px] mt-1">
+                  {validationErrors.price}
+                </p>
+              )}
             </div>
 
             {/* Contact Phone */}
@@ -609,6 +707,11 @@ export default function CreateListingPage() {
                 <p className="text-xs text-yellow-400">
                   ⚠️ Please drop a pin on the map to mark the property location
                 </p>
+                {validationErrors.pin_location && (
+                  <p className="text-red-400 text-[10px] mt-1">
+                    {validationErrors.pin_location}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -912,6 +1015,8 @@ export default function CreateListingPage() {
               </span>
             </label>
 
+            <SafetyTip page="image_upload" className="mb-4" />
+
             <input
               ref={cameraInputRef}
               type="file"
@@ -921,7 +1026,13 @@ export default function CreateListingPage() {
               onChange={handleCameraCapture}
             />
 
-            <div className="border-2 border-dashed border-white/15 rounded-xl p-8 text-center bg-black/30">
+            <div
+              className={`border-2 border-dashed rounded-xl p-8 text-center bg-black/30 ${
+                validationErrors.images
+                  ? "border-red-500/50"
+                  : "border-white/15"
+              }`}
+            >
               <CameraIcon className="w-16 h-16 text-blue-400 mx-auto mb-3" />
               <p className="text-white font-medium text-lg">
                 Take a Photo at the Property
@@ -941,6 +1052,11 @@ export default function CreateListingPage() {
                 Photos will be watermarked with your details and location
                 verified
               </p>
+              {validationErrors.images && (
+                <p className="text-red-400 text-[10px] mt-2">
+                  {validationErrors.images}
+                </p>
+              )}
             </div>
 
             {imagePreviews.length > 0 && (
@@ -986,6 +1102,9 @@ export default function CreateListingPage() {
               </span>
             </p>
           </div>
+
+          {/* ============ SAFETY TIP - SUBMIT ============ */}
+          <SafetyTip page="create_listing_submit" className="mb-4" />
 
           {/* Submit Button */}
           <div className="flex gap-3 pt-4 border-t border-white/10">

@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import API from "../services/api";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { StarIcon as StarOutline } from "@heroicons/react/24/outline";
+import SafetyTip from "./SafetyTip";
 
 // Submit review mutation
 const submitReview = async ({
@@ -174,6 +175,9 @@ const ReviewSection = ({
 
   return (
     <div className="space-y-4">
+      {/* ============ SAFETY TIP ============ */}
+      <SafetyTip page="review" className="mb-2" />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-white">

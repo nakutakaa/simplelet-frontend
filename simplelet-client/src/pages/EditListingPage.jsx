@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import API from "../services/api";
 import { XMarkIcon, CameraIcon } from "@heroicons/react/24/outline";
 import MapPicker from "../components/MapPicker";
+import SafetyTip from "../components/SafetyTip";
 
 // House types
 const HOUSE_TYPES = [
@@ -57,6 +58,48 @@ const BACKUP_POWER = [
   { value: "none", label: "None" },
 ];
 
+// ============ ERROR MESSAGES ============
+const getErrorMessage = (error, context = "edit_listing") => {
+  const status = error.response?.status;
+  const data = error.response?.data;
+  const errorCode = data?.error_code || data?.error || "";
+
+  const errorMap = {
+    listing_not_found: "❌ Listing not found. It may have been deleted.",
+    listing_inactive: "⛔ This listing is no longer active.",
+    unauthorized: "🚫 You don't have permission to edit this listing.",
+    update_failed: "❌ Failed to update listing. Please try again.",
+    invalid_house_type: "🏠 Invalid property type selected.",
+    invalid_price: "💰 Please enter a valid price.",
+    price_negative: "💰 Price cannot be negative.",
+    invalid_phone: "📱 Invalid phone number format.",
+    image_delete_failed: "❌ Failed to delete image. Please try again.",
+    image_upload_failed: "❌ Failed to upload images. Please try again.",
+    image_rejected: "🚫 Some images were rejected. Check the reasons below.",
+    network_error: "📡 Network error. Please check your connection.",
+    server_error: "⚠️ Server error. Please try again later.",
+  };
+
+  if (errorCode && errorMap[errorCode]) {
+    return errorMap[errorCode];
+  }
+
+  if (status === 400) return "⚠️ Please check your information and try again.";
+  if (status === 401) return "🔒 Session expired. Please login again.";
+  if (status === 403)
+    return "🚫 You don't have permission to edit this listing.";
+  if (status === 404) return "❌ Listing not found.";
+  if (status === 409)
+    return "⚠️ This listing has been modified by another user.";
+  if (status === 429) return "⏳ Too many attempts. Please wait a few minutes.";
+  if (status === 500) return "⚠️ Server error. Please try again later.";
+  if (!error.response) return "📡 Network error. Please check your connection.";
+
+  return (
+    data?.message || data?.error || "❌ Something went wrong. Please try again."
+  );
+};
+
 // Fetch single listing
 const fetchListing = async (id) => {
   const { data } = await API.get(`/listings/${id}`);
@@ -95,7 +138,6 @@ export default function EditListingPage() {
   const searchTimeoutRef = useRef(null);
 
   const [formData, setFormData] = useState({
-    // Existing fields
     title: "",
     house_type: "studio",
     location: "",
@@ -104,10 +146,8 @@ export default function EditListingPage() {
     contact_phone: "",
     latitude: "",
     longitude: "",
-    // ============ Pin Location Fields ============
     pin_latitude: "",
     pin_longitude: "",
-    // ============ Layer 1 Fields ============
     service_charge: "",
     trash_fee: "",
     water_source: "",
@@ -138,16 +178,15 @@ export default function EditListingPage() {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [pinLocation, setPinLocation] = useState(null);
+  const [validationErrors, setValidationErrors] = useState({});
 
   // ============ AUTO-SEARCH LOCATION ON MAP ============
   useEffect(() => {
-    // Clear previous timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
     const searchLocation = async () => {
-      // Only search if location has at least 3 characters
       if (!formData.location || formData.location.length < 3) return;
 
       try {
@@ -169,12 +208,10 @@ export default function EditListingPage() {
           }));
         }
       } catch (error) {
-        // Silent fail - user can still drop pin manually
         console.debug("Location search:", error);
       }
     };
 
-    // Debounce: wait 1 second after user stops typing
     searchTimeoutRef.current = setTimeout(searchLocation, 1000);
     return () => {
       if (searchTimeoutRef.current) {
@@ -188,15 +225,16 @@ export default function EditListingPage() {
     data: listing,
     isLoading,
     error,
+    refetch,
   } = useQuery({
     queryKey: ["listing", id],
     queryFn: () => fetchListing(id),
+    retry: 1,
   });
 
   // Populate form when data loads
   useEffect(() => {
     if (listing) {
-      // Set pin location if exists
       if (listing.pin_latitude && listing.pin_longitude) {
         setPinLocation({
           latitude: listing.pin_latitude,
@@ -240,13 +278,18 @@ export default function EditListingPage() {
     }
   }, [listing]);
 
-  // Update mutation
+  // ============ UPDATE MUTATION ============
   const updateMutation = useMutation({
     mutationFn: updateListing,
     onSuccess: async (data) => {
       // Handle image deletions
       for (const imageId of imagesToDelete) {
-        await deleteImage(imageId);
+        try {
+          await deleteImage(imageId);
+        } catch (error) {
+          const errorMsg = getErrorMessage(error, "delete_image");
+          toast.error(errorMsg);
+        }
       }
 
       // Handle new image uploads
@@ -258,12 +301,10 @@ export default function EditListingPage() {
             images: newImages,
           });
 
-          // Check if any images were rejected
           const rejectedCount = result.rejected_files?.length || 0;
           const uploadedCount = result.uploaded?.length || 0;
 
           if (rejectedCount > 0 && uploadedCount === 0) {
-            // ALL images rejected
             toast.error(
               `❌ All ${rejectedCount} images were rejected. No new images added.`,
             );
@@ -278,7 +319,7 @@ export default function EditListingPage() {
           }
 
           if (rejectedCount > 0 && uploadedCount > 0) {
-            toast.error(
+            toast.warning(
               `⚠️ ${rejectedCount} image(s) rejected. ${uploadedCount} uploaded successfully.`,
             );
             result.rejected_files.forEach((rejected) => {
@@ -286,28 +327,35 @@ export default function EditListingPage() {
             });
           }
 
-          if (result.location_warnings && result.location_warnings.length > 0) {
-            const warning = result.location_warnings[0];
-            toast.error(`⚠️ ${warning.warning}`);
+          if (result.location_warnings?.length > 0) {
+            result.location_warnings.forEach((warning) => {
+              toast.warning(`⚠️ ${warning.warning}`);
+            });
           }
           if (result.location_verified) {
             toast.success("📍 Location verified!");
           }
         } catch (error) {
-          toast.error("Failed to upload images. Please try again.");
+          const errorMsg = getErrorMessage(error, "upload");
+          toast.error(errorMsg);
           setIsUploadingImages(false);
           return;
         }
         setIsUploadingImages(false);
       }
 
-      toast.success("Listing updated successfully!");
+      toast.success("✅ Listing updated successfully!");
       queryClient.invalidateQueries(["myListings"]);
       queryClient.invalidateQueries(["listing", id]);
       navigate("/dashboard");
     },
     onError: (error) => {
-      toast.error(error.response?.data?.error || "Failed to update listing");
+      const errorMsg = getErrorMessage(error, "update");
+      toast.error(errorMsg);
+
+      if (error.response?.status === 401) {
+        navigate("/login");
+      }
     },
   });
 
@@ -318,26 +366,57 @@ export default function EditListingPage() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+
+    if (validationErrors[name]) {
+      setValidationErrors((prev) => ({ ...prev, [name]: null }));
+    }
   };
 
   // Handle pin drop from map
   const handlePinDrop = (location) => {
-    console.log("📍 Pin dropped:", location);
     setPinLocation(location);
     setFormData((prev) => ({
       ...prev,
       pin_latitude: location.latitude.toString(),
       pin_longitude: location.longitude.toString(),
     }));
+    setValidationErrors((prev) => ({ ...prev, pin_location: null }));
     toast.success("📍 Pin updated on map!");
+  };
+
+  // Validate form before submission
+  const validateForm = () => {
+    const errors = {};
+
+    if (!formData.house_type) {
+      errors.house_type = "🏠 Please select a property type.";
+    }
+
+    if (!formData.location || formData.location.length < 2) {
+      errors.location = "📍 Please enter a valid location.";
+    }
+
+    if (formData.price && isNaN(parseFloat(formData.price))) {
+      errors.price = "💰 Please enter a valid price.";
+    }
+
+    if (formData.price && parseFloat(formData.price) < 0) {
+      errors.price = "💰 Price cannot be negative.";
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!formData.house_type || !formData.location) {
-      toast.error("House type and location are required");
+    if (!validateForm()) {
+      const firstError = Object.values(validationErrors)[0];
+      if (firstError) {
+        toast.error(firstError);
+      }
       return;
     }
 
@@ -386,7 +465,6 @@ export default function EditListingPage() {
 
   // ============ CAMERA CAPTURE ============
   const handleCameraCapture = async (e) => {
-    // Prevent any default behavior that might cause page reload
     e.preventDefault();
     e.stopPropagation();
 
@@ -400,21 +478,19 @@ export default function EditListingPage() {
     console.log("📸 File captured:", file.name, file.type, file.size);
 
     if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file");
+      toast.error("📸 Please select an image file.");
       e.target.value = "";
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Image exceeds 10MB limit");
+      toast.error("📸 Image exceeds 10MB limit.");
       e.target.value = "";
       return;
     }
 
-    // Show loading state
     const loadingToastId = toast.loading("Processing photo...");
 
-    // GPS with fallback
     let deviceLat = null;
     let deviceLon = null;
 
@@ -445,10 +521,9 @@ export default function EditListingPage() {
       console.warn("⚠️ GPS error:", error.message);
       setLocationStatus({
         success: false,
-        message:
-          "⚠️ Could not get GPS location. Location verification may be skipped.",
+        message: "⚠️ Could not get GPS location. Using pin if available.",
       });
-      toast.error("⚠️ GPS not available. Location verification skipped.", {
+      toast.warning("⚠️ GPS not available. Using pin if set.", {
         id: loadingToastId,
       });
     }
@@ -479,10 +554,32 @@ export default function EditListingPage() {
     );
   }
 
-  if (error || !listing) {
+  if (error) {
+    const errorMsg = getErrorMessage(error, "fetch");
+    toast.error(errorMsg);
+
     return (
       <div className="text-center py-12">
-        <p className="text-red-400">Listing not found</p>
+        <p className="text-red-400">{errorMsg}</p>
+        <div className="flex justify-center gap-3 mt-4">
+          <button onClick={() => refetch()} className="btn-primary">
+            Retry
+          </button>
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="btn-outline"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!listing) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-400">❌ Listing not found</p>
         <button
           onClick={() => navigate("/dashboard")}
           className="btn-primary mt-4"
@@ -510,6 +607,8 @@ export default function EditListingPage() {
               Basic Information
             </h2>
 
+            <SafetyTip page="edit_listing" className="mb-4" />
+
             {/* House Type */}
             <div>
               <label className="label">Property Type *</label>
@@ -517,7 +616,7 @@ export default function EditListingPage() {
                 name="house_type"
                 value={formData.house_type}
                 onChange={handleChange}
-                className="input"
+                className={`input ${validationErrors.house_type ? "border-red-500/50 focus:border-red-500" : ""}`}
                 required
               >
                 {HOUSE_TYPES.map((type) => (
@@ -526,6 +625,11 @@ export default function EditListingPage() {
                   </option>
                 ))}
               </select>
+              {validationErrors.house_type && (
+                <p className="text-red-400 text-[10px] mt-1">
+                  {validationErrors.house_type}
+                </p>
+              )}
             </div>
 
             {/* Title */}
@@ -550,12 +654,17 @@ export default function EditListingPage() {
                 value={formData.location}
                 onChange={handleChange}
                 placeholder="e.g., Kilimani, Nairobi"
-                className="input"
+                className={`input ${validationErrors.location ? "border-red-500/50 focus:border-red-500" : ""}`}
                 required
               />
               <p className="text-[10px] text-gray-500 mt-1">
                 💡 The map below will automatically search for this location
               </p>
+              {validationErrors.location && (
+                <p className="text-red-400 text-[10px] mt-1">
+                  {validationErrors.location}
+                </p>
+              )}
             </div>
 
             {/* Hidden GPS fields */}
@@ -602,8 +711,13 @@ export default function EditListingPage() {
                 value={formData.price}
                 onChange={handleChange}
                 placeholder="e.g., 25000"
-                className="input"
+                className={`input ${validationErrors.price ? "border-red-500/50 focus:border-red-500" : ""}`}
               />
+              {validationErrors.price && (
+                <p className="text-red-400 text-[10px] mt-1">
+                  {validationErrors.price}
+                </p>
+              )}
             </div>
 
             {/* Contact Phone */}
@@ -664,6 +778,11 @@ export default function EditListingPage() {
                   ⚠️ No pin set. Drop a pin on the map to mark the property
                   location.
                 </p>
+                {validationErrors.pin_location && (
+                  <p className="text-red-400 text-[10px] mt-1">
+                    {validationErrors.pin_location}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -994,7 +1113,8 @@ export default function EditListingPage() {
               </span>
             </label>
 
-            {/* Hidden camera input */}
+            <SafetyTip page="image_upload" className="mb-4" />
+
             <input
               ref={cameraInputRef}
               type="file"
@@ -1022,7 +1142,6 @@ export default function EditListingPage() {
               </button>
             </div>
 
-            {/* New Image Previews */}
             {newImagePreviews.length > 0 && (
               <div className="mt-4">
                 <div className="grid grid-cols-4 gap-3">
@@ -1086,7 +1205,7 @@ export default function EditListingPage() {
               disabled={isSubmitting}
               className="flex-1 btn-primary disabled:opacity-50"
             >
-              {isSubmitting ? "Saving..." : "Save Changes"}
+              {isSubmitting ? "Saving..." : "💾 Save Changes"}
             </button>
           </div>
         </form>

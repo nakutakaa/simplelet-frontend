@@ -9,6 +9,7 @@ import CommentItem from "../components/CommentItem";
 import ReviewSection from "../components/ReviewSection";
 import WhatsAppButton from "../components/WhatsAppButton";
 import CredibilityBadge from "../components/CredibilityBadge";
+import SafetyTip from "../components/SafetyTip";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -35,6 +36,49 @@ const verifiedPinIcon = new L.Icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
+
+// ============ ERROR MESSAGES ============
+const getErrorMessage = (error, context = "detail") => {
+  const status = error.response?.status;
+  const data = error.response?.data;
+  const errorCode = data?.error_code || data?.error || "";
+
+  const errorMap = {
+    listing_not_found:
+      "❌ This listing could not be found. It may have been removed or expired.",
+    listing_expired: "⏰ This listing has expired and is no longer available.",
+    listing_inactive: "⛔ This listing is no longer active.",
+    unauthorized: "🚫 You don't have permission to view this listing.",
+    comment_failed: "❌ Failed to post comment. Please try again.",
+    comment_too_short:
+      "📝 Your comment is too short. Please write at least 5 characters.",
+    comment_too_long:
+      "📝 Your comment is too long. Please keep it under 1000 characters.",
+    favorite_failed: "❌ Failed to update favorite. Please try again.",
+    already_favorited: "❤️ This listing is already in your favorites.",
+    not_favorited: "💔 This listing is not in your favorites.",
+    network_error: "📡 Network error. Please check your connection.",
+    server_error: "⚠️ Server error. Please try again later.",
+  };
+
+  if (errorCode && errorMap[errorCode]) {
+    return errorMap[errorCode];
+  }
+
+  if (status === 400) return "⚠️ Please check your information and try again.";
+  if (status === 401) return "🔒 Please login to perform this action.";
+  if (status === 403)
+    return "🚫 You don't have permission to perform this action.";
+  if (status === 404) return "❌ Listing not found.";
+  if (status === 409) return "⚠️ This action could not be completed.";
+  if (status === 429) return "⏳ Too many attempts. Please wait a few minutes.";
+  if (status === 500) return "⚠️ Server error. Please try again later.";
+  if (!error.response) return "📡 Network error. Please check your connection.";
+
+  return (
+    data?.message || data?.error || "❌ Something went wrong. Please try again."
+  );
+};
 
 // Helper function to get optimized Cloudinary URL
 const getOptimizedImageUrl = (url, width = 800, height = 600) => {
@@ -91,6 +135,7 @@ export default function ListingDetailPage() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [commentContent, setCommentContent] = useState("");
   const [isFavorited, setIsFavorited] = useState(false);
+  const [isCommenting, setIsCommenting] = useState(false);
 
   // Check if user is logged in
   const token = localStorage.getItem("token");
@@ -114,16 +159,17 @@ export default function ListingDetailPage() {
   // Toggle favorite
   const toggleFavorite = async () => {
     if (!isLoggedIn) {
-      toast.error("Please login to save favorites");
+      toast.error("🔒 Please login to save favorites");
       navigate("/login");
       return;
     }
     try {
       const { data } = await API.post(`/favorites/listings/${id}`);
       setIsFavorited(data.is_favorited);
-      toast.success(data.message);
+      toast.success(data.message || "❤️ Favorite updated!");
     } catch (error) {
-      toast.error(error.response?.data?.error || "Failed to update favorite");
+      const errorMsg = getErrorMessage(error, "favorite");
+      toast.error(errorMsg);
     }
   };
 
@@ -136,6 +182,7 @@ export default function ListingDetailPage() {
   } = useQuery({
     queryKey: ["listing", id],
     queryFn: () => fetchListing(id),
+    retry: 1,
   });
 
   // Fetch comments
@@ -164,14 +211,16 @@ export default function ListingDetailPage() {
   const commentMutation = useMutation({
     mutationFn: postComment,
     onSuccess: () => {
-      toast.success("Comment posted!");
+      toast.success("💬 Comment posted!");
       setCommentContent("");
+      setIsCommenting(false);
       queryClient.invalidateQueries(["comments", id]);
       refetchComments();
     },
     onError: (error) => {
-      const errorMsg = error.response?.data?.error || "Failed to post comment";
+      const errorMsg = getErrorMessage(error, "comment");
       toast.error(errorMsg);
+      setIsCommenting(false);
     },
   });
 
@@ -182,7 +231,7 @@ export default function ListingDetailPage() {
   const handleCopyPhone = () => {
     if (listing?.contact_phone) {
       navigator.clipboard.writeText(listing.contact_phone);
-      toast.success("Phone number copied to clipboard!");
+      toast.success("📋 Phone number copied to clipboard!");
     }
   };
 
@@ -194,15 +243,24 @@ export default function ListingDetailPage() {
   const handleCommentSubmit = (e) => {
     e.preventDefault();
     if (!isLoggedIn) {
-      toast.error("Please login to comment");
+      toast.error("🔒 Please login to comment");
       navigate("/login");
       return;
     }
     if (!commentContent.trim()) {
-      toast.error("Please enter a comment");
+      toast.error("📝 Please enter a comment");
+      return;
+    }
+    if (commentContent.trim().length < 3) {
+      toast.error("📝 Comment must be at least 3 characters");
+      return;
+    }
+    if (commentContent.length > 1000) {
+      toast.error("📝 Comment is too long (max 1000 characters)");
       return;
     }
 
+    setIsCommenting(true);
     commentMutation.mutate({
       listingId: id,
       content: commentContent,
@@ -212,7 +270,7 @@ export default function ListingDetailPage() {
   const handleReviewSubmitted = () => {
     refetchReviews();
     refetchListing();
-    toast.success("Review submitted! Thank you for your feedback.");
+    toast.success("⭐ Review submitted! Thank you for your feedback.");
   };
 
   // Determine if we have location data to show on map
@@ -245,10 +303,29 @@ export default function ListingDetailPage() {
     );
   }
 
-  if (error || !listing) {
+  if (error) {
+    const errorMsg = getErrorMessage(error, "fetch");
+    toast.error(errorMsg);
+
     return (
       <div className="text-center py-12">
-        <p className="text-red-400">Listing not found</p>
+        <p className="text-red-400">{errorMsg}</p>
+        <div className="flex justify-center gap-3 mt-4">
+          <button onClick={() => refetchListing()} className="btn-primary">
+            Retry
+          </button>
+          <button onClick={() => navigate("/")} className="btn-outline">
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!listing) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-400">❌ Listing not found</p>
         <button onClick={() => navigate("/")} className="btn-primary mt-4">
           Back to Home
         </button>
@@ -360,6 +437,8 @@ export default function ListingDetailPage() {
 
       {/* Listing Details */}
       <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
+        <SafetyTip page="detail" className="mb-4" />
+
         {/* Title & Status */}
         <div className="flex justify-between items-start mb-4">
           <h1 className="text-xl sm:text-2xl font-bold text-white">
@@ -490,7 +569,7 @@ export default function ListingDetailPage() {
                 d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
               />
             </svg>
-            {isFavorited ? "Saved" : "Save"}
+            {isFavorited ? "❤️ Saved" : "🤍 Save"}
           </button>
         ) : (
           <Link to="/login" className="inline-block mb-4">
@@ -700,7 +779,7 @@ export default function ListingDetailPage() {
           </div>
         )}
 
-        {/* ============ NEW: MAP DISPLAY ============ */}
+        {/* ============ MAP DISPLAY ============ */}
         {hasLocation && mapLocation && (
           <div className="border-t border-white/10 pt-4 mb-4">
             <h3 className="text-sm font-semibold text-gray-300 mb-2">
@@ -812,9 +891,11 @@ export default function ListingDetailPage() {
 
         {/* Contact Section with WhatsApp */}
         <div className="border-t border-white/10 pt-6">
+          <SafetyTip page="contact" className="mb-4" />
+
           {!showContact ? (
             <button onClick={handleContactClick} className="w-full btn-primary">
-              Reveal Contact Number
+              📞 Reveal Contact Number
             </button>
           ) : (
             <div className="space-y-3">
@@ -859,6 +940,8 @@ export default function ListingDetailPage() {
                 listingTitle={listing.title}
                 listingPrice={listing.price}
               />
+
+              <SafetyTip page="whatsapp" className="mt-3" />
             </div>
           )}
         </div>
@@ -879,7 +962,7 @@ export default function ListingDetailPage() {
         {/* Comments Section */}
         <div className="bg-black rounded-2xl border border-white/10 p-4 sm:p-6 mt-6">
           <h3 className="text-lg font-semibold text-white mb-4">
-            Comments
+            💬 Comments
             {commentsData && (
               <span className="text-sm text-gray-500 ml-2">
                 ({commentsData.total})
@@ -896,14 +979,14 @@ export default function ListingDetailPage() {
                 onChange={(e) => setCommentContent(e.target.value)}
                 placeholder="Write a comment..."
                 className="flex-1 input"
-                disabled={commentMutation.isPending}
+                disabled={isCommenting}
               />
               <button
                 type="submit"
-                disabled={commentMutation.isPending || !commentContent.trim()}
-                className="btn-primary px-6"
+                disabled={isCommenting || !commentContent.trim()}
+                className="btn-primary px-6 disabled:opacity-50"
               >
-                {commentMutation.isPending ? "Posting..." : "Post"}
+                {isCommenting ? "Posting..." : "💬 Post"}
               </button>
             </form>
           ) : (

@@ -4,6 +4,44 @@ import { useNavigate, Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
+import SafetyTip from "../components/SafetyTip";
+
+// ============ ERROR MESSAGES ============
+const getErrorMessage = (error) => {
+  const status = error.response?.status;
+  const data = error.response?.data;
+  const errorCode = data?.error_code || data?.error || "";
+
+  const errorMap = {
+    phone_exists:
+      "📱 This phone number is already registered. Please login instead.",
+    invalid_phone:
+      "📱 Please enter a valid phone number in the format +254XXXXXXXXX.",
+    weak_password:
+      "🔑 Password must be at least 6 characters and contain letters and numbers.",
+    name_required: "👤 Please enter your full name.",
+    invalid_code: "❌ Invalid verification code. Please check and try again.",
+    code_expired:
+      "⏳ Your verification code has expired. Please request a new one.",
+    registration_failed: "❌ Registration failed. Please try again.",
+    network_error: "📡 Network error. Please check your internet connection.",
+    server_error: "⚠️ Server error. Please try again later.",
+  };
+
+  if (errorCode && errorMap[errorCode]) {
+    return errorMap[errorCode];
+  }
+
+  if (status === 400) return "⚠️ Please check your information and try again.";
+  if (status === 409)
+    return "📱 This phone number is already registered. Please login.";
+  if (status === 500) return "⚠️ Server error. Please try again later.";
+  if (!error.response) return "📡 Network error. Please check your connection.";
+
+  return (
+    data?.message || data?.error || "❌ Something went wrong. Please try again."
+  );
+};
 
 const sendRegistrationCode = async (phone) => {
   const { data } = await API.post("/auth/send-registration-code", { phone });
@@ -36,11 +74,25 @@ export default function RegisterPage() {
   const sendCodeMutation = useMutation({
     mutationFn: sendRegistrationCode,
     onSuccess: () => {
-      toast.success("Verification code sent! Check your phone.");
+      toast.success("✅ Verification code sent! Check your phone.");
       setStep(2);
     },
     onError: (error) => {
-      toast.error(error.response?.data?.error || "Failed to send code");
+      const errorMsg = getErrorMessage(error);
+      toast.error(errorMsg);
+
+      // If phone exists, offer to login
+      if (error.response?.status === 409) {
+        setTimeout(() => {
+          if (
+            confirm(
+              "This phone is already registered. Would you like to login instead?",
+            )
+          ) {
+            navigate("/login");
+          }
+        }, 1500);
+      }
     },
   });
 
@@ -49,40 +101,66 @@ export default function RegisterPage() {
     onSuccess: (data) => {
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
-      toast.success("Account created successfully!");
+      toast.success("🎉 Account created successfully! Welcome to SimpleLet!");
       navigate("/");
     },
     onError: (error) => {
-      toast.error(error.response?.data?.error || "Verification failed");
+      const errorMsg = getErrorMessage(error);
+      toast.error(errorMsg);
+
+      if (error.response?.data?.error?.includes("expired")) {
+        setStep(1);
+        toast.info("🔄 Please request a new verification code.");
+      }
     },
   });
 
   const handleSendCode = (e) => {
     e.preventDefault();
-    if (
-      !formData.name ||
-      !formData.phone ||
-      !formData.password ||
-      !formData.confirmPassword
-    ) {
-      toast.error("Please fill in all fields");
+
+    // Client-side validation
+    if (!formData.name.trim()) {
+      toast.error("👤 Please enter your full name.");
       return;
     }
-    if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match");
+    if (formData.name.length < 2) {
+      toast.error("👤 Name must be at least 2 characters.");
+      return;
+    }
+    if (!formData.phone) {
+      toast.error("📱 Please enter your phone number.");
+      return;
+    }
+    if (!formData.phone.match(/^\+254[0-9]{9}$/)) {
+      toast.error(
+        "📱 Invalid phone format. Please use +254XXXXXXXXX (10 digits after +254)",
+      );
+      return;
+    }
+    if (!formData.password) {
+      toast.error("🔑 Please create a password.");
       return;
     }
     if (formData.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+      toast.error("🔑 Password must be at least 6 characters.");
       return;
     }
+    if (formData.password !== formData.confirmPassword) {
+      toast.error("🔑 Passwords do not match. Please try again.");
+      return;
+    }
+
     sendCodeMutation.mutate(formData.phone);
   };
 
   const handleVerify = (e) => {
     e.preventDefault();
-    if (!formData.code || formData.code.length !== 6) {
-      toast.error("Please enter the 6-digit code");
+    if (!formData.code) {
+      toast.error("📱 Please enter the verification code.");
+      return;
+    }
+    if (formData.code.length !== 6) {
+      toast.error("📱 Please enter the 6-digit code.");
       return;
     }
     registerMutation.mutate({
@@ -100,9 +178,14 @@ export default function RegisterPage() {
   return (
     <div className="max-w-md mx-auto">
       <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-6 sm:p-8 shadow-xl">
-        <h2 className="text-2xl font-bold text-center mb-6 heading-gradient">
+        <h2 className="text-2xl font-bold text-center mb-2 heading-gradient">
           Create an Account
         </h2>
+        <p className="text-center text-gray-400 text-sm mb-6">
+          Join SimpleLet and start posting properties
+        </p>
+
+        <SafetyTip page="register" className="mb-6" />
 
         {step === 1 ? (
           <form onSubmit={handleSendCode} className="space-y-4">
@@ -117,6 +200,9 @@ export default function RegisterPage() {
                 className="input"
                 required
               />
+              <p className="text-[10px] text-gray-500 mt-1">
+                This will be displayed on your listings
+              </p>
             </div>
 
             <div>
@@ -143,7 +229,7 @@ export default function RegisterPage() {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  placeholder="Create a password"
+                  placeholder="Create a password (min 6 characters)"
                   className="input pr-10"
                   required
                 />
@@ -155,6 +241,9 @@ export default function RegisterPage() {
                   {showPassword ? "🙈" : "👁️"}
                 </button>
               </div>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Password must be at least 6 characters
+              </p>
             </div>
 
             <div>
@@ -188,6 +277,18 @@ export default function RegisterPage() {
                 ? "Sending code..."
                 : "Send Verification Code"}
             </button>
+
+            <div className="text-center">
+              <p className="text-sm text-gray-400">
+                Already have an account?{" "}
+                <Link
+                  to="/login"
+                  className="text-blue-400 hover:text-blue-300 transition"
+                >
+                  Login here
+                </Link>
+              </p>
+            </div>
           </form>
         ) : (
           <form onSubmit={handleVerify} className="space-y-4">
@@ -195,6 +296,9 @@ export default function RegisterPage() {
               <p className="text-sm text-gray-400">
                 We sent a code to{" "}
                 <span className="text-white">{formData.phone}</span>
+              </p>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Code expires in 10 minutes
               </p>
             </div>
 
@@ -211,6 +315,9 @@ export default function RegisterPage() {
                 required
                 autoFocus
               />
+              <p className="text-[10px] text-gray-500 mt-1">
+                Enter the 6-digit code sent to your phone
+              </p>
             </div>
 
             <button
@@ -230,18 +337,19 @@ export default function RegisterPage() {
             >
               ← Back to edit information
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStep(1);
+                toast.info("🔄 Request a new code with your details.");
+              }}
+              className="w-full text-xs text-gray-500 hover:text-gray-400 transition"
+            >
+              🔄 Resend verification code
+            </button>
           </form>
         )}
-
-        <p className="text-center text-sm text-gray-400 mt-6">
-          Already have an account?{" "}
-          <Link
-            to="/login"
-            className="text-blue-400 hover:text-blue-300 transition"
-          >
-            Login here
-          </Link>
-        </p>
       </div>
     </div>
   );
