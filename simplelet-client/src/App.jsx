@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
+import PageErrorBoundary from "./components/PageErrorBoundary";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -53,68 +55,115 @@ function App() {
   }, []);
 
   return (
-    <BrowserRouter>
-      <Layout>
-        {/* Location Permission Prompt */}
-        <LocationPermission
-          onLocationGranted={handleLocationGranted}
-          onLocationDenied={handleLocationDenied}
-        />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Layout>
+          {/* Location Permission Prompt */}
+          <LocationPermission
+            onLocationGranted={handleLocationGranted}
+            onLocationDenied={handleLocationDenied}
+          />
 
-        <Routes>
-          {/* PUBLIC ROUTES */}
-          <Route path="/" element={<HomePage />} />
-          <Route path="/listing/:id" element={<ListingDetailPage />} />
+          <Routes>
+            {/* PUBLIC ROUTES */}
+            <Route
+              path="/"
+              element={
+                <PageErrorBoundary>
+                  <HomePage />
+                </PageErrorBoundary>
+              }
+            />
+            <Route
+              path="/listing/:id"
+              element={
+                <PageErrorBoundary>
+                  <ListingDetailPage />
+                </PageErrorBoundary>
+              }
+            />
 
-          {/* AUTH ROUTES */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/verify" element={<VerifyPage />} />
+            {/* AUTH ROUTES */}
+            <Route
+              path="/login"
+              element={
+                <PageErrorBoundary>
+                  <LoginPage />
+                </PageErrorBoundary>
+              }
+            />
+            <Route
+              path="/register"
+              element={
+                <PageErrorBoundary>
+                  <RegisterPage />
+                </PageErrorBoundary>
+              }
+            />
+            <Route
+              path="/verify"
+              element={
+                <PageErrorBoundary>
+                  <VerifyPage />
+                </PageErrorBoundary>
+              }
+            />
 
-          {/* PROTECTED ROUTES */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute requireVerified={true}>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/create-listing"
-            element={
-              <ProtectedRoute requireVerified={true}>
-                <CreateListingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/edit-listing/:id"
-            element={
-              <ProtectedRoute requireVerified={true}>
-                <EditListingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute requireVerified={true}>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/favorites"
-            element={
-              <ProtectedRoute requireVerified={true}>
-                <FavoritesPage />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </Layout>
-    </BrowserRouter>
+            {/* PROTECTED ROUTES */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute requireVerified={true}>
+                  <PageErrorBoundary>
+                    <DashboardPage />
+                  </PageErrorBoundary>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/create-listing"
+              element={
+                <ProtectedRoute requireVerified={true}>
+                  <PageErrorBoundary>
+                    <CreateListingPage />
+                  </PageErrorBoundary>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/edit-listing/:id"
+              element={
+                <ProtectedRoute requireVerified={true}>
+                  <PageErrorBoundary>
+                    <EditListingPage />
+                  </PageErrorBoundary>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute requireVerified={true}>
+                  <PageErrorBoundary>
+                    <ProfilePage />
+                  </PageErrorBoundary>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/favorites"
+              element={
+                <ProtectedRoute requireVerified={true}>
+                  <PageErrorBoundary>
+                    <FavoritesPage />
+                  </PageErrorBoundary>
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Layout>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 
