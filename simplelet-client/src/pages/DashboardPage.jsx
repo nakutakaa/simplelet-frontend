@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
+import SimpleAmbientBackground from "../components/SimpleAmbientBackground";
 
 // Fetch user's listings
 const fetchMyListings = async () => {
@@ -52,15 +53,11 @@ export default function DashboardPage() {
   } = useQuery({
     queryKey: ["myListings"],
     queryFn: fetchMyListings,
-    // REFRESH WHEN PAGE BECOMES VISIBLE
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    // Auto-refresh every 30 seconds
     refetchInterval: 30000,
-    // Don't refetch on background if inactive
     refetchIntervalInBackground: false,
-    // Stale time: 5 seconds
     staleTime: 5000,
   });
 
@@ -95,8 +92,7 @@ export default function DashboardPage() {
   const deleteMutation = useMutation({
     mutationFn: deleteListing,
     onSuccess: () => {
-      toast.success("Listing deleted successfully");
-      // Force refetch to update the list
+      toast.success("🗑️ Listing deleted successfully");
       queryClient.invalidateQueries(["myListings"]);
       refetchListings();
     },
@@ -122,7 +118,7 @@ export default function DashboardPage() {
   const confirmMutation = useMutation({
     mutationFn: confirmListing,
     onSuccess: (data) => {
-      toast.success(data.message || "Listing renewed successfully!");
+      toast.success(data.message || "🔄 Listing renewed successfully!");
       queryClient.invalidateQueries(["myListings"]);
       refetchListings();
     },
@@ -186,7 +182,7 @@ export default function DashboardPage() {
   const handleManualRefresh = () => {
     toast.loading("Refreshing...", { id: "refresh" });
     refetchListings().then(() => {
-      toast.success("Dashboard updated!", { id: "refresh" });
+      toast.success("✅ Dashboard updated!", { id: "refresh" });
     });
   };
 
@@ -222,10 +218,6 @@ export default function DashboardPage() {
   );
   const takenListings = listings.filter((l) => l.is_taken && l.is_active);
   const expiredListings = listings.filter((l) => l.is_expired || !l.is_active);
-  const needsConfirmation = listings.filter(
-    (l) =>
-      l.expiry_status === "needs_confirmation" || l.expiry_status === "warning",
-  );
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -385,28 +377,76 @@ export default function DashboardPage() {
             const isExpired = listing.is_expired || !listing.is_active;
             const status = listing.expiry_status || "active";
             const statusText = listing.expiry_status_text || "Active";
+            const coverImage = listing.images?.[0]?.thumbnail;
 
             return (
-              <div
+              <SimpleAmbientBackground
                 key={listing.id}
-                className={`bg-[#0a0a0a] rounded-2xl border overflow-hidden shadow-xl transition-all duration-300 ${
-                  isExpired
-                    ? "border-red-500/30 opacity-60"
-                    : "border-white/10 hover:border-blue-500/30"
-                }`}
+                imageUrl={coverImage}
+                intensity={0.15}
+                blur={30}
+                className="rounded-2xl overflow-hidden transition-colors duration-700"
               >
-                {/* Image */}
-                <div className="h-48 bg-[#0a0a0a] relative">
-                  {listing.images && listing.images[0] ? (
-                    <img
-                      src={listing.images[0].thumbnail}
-                      alt={listing.title}
-                      className="w-full h-48 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-48 flex items-center justify-center">
+                <div
+                  className={`bg-[#0a0a0a]/80 backdrop-blur-sm border overflow-hidden shadow-xl transition-all duration-300 ${
+                    isExpired
+                      ? "border-red-500/30 opacity-60"
+                      : "border-white/10 hover:border-blue-500/30"
+                  }`}
+                >
+                  {/* Image */}
+                  <div className="h-48 bg-[#0a0a0a] relative">
+                    {listing.images && listing.images[0] ? (
+                      <img
+                        src={listing.images[0].thumbnail}
+                        alt={listing.title}
+                        className="w-full h-48 object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-48 flex items-center justify-center">
+                        <svg
+                          className="w-16 h-16 text-gray-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </div>
+                    )}
+
+                    {/* Status Badges */}
+                    <div className="absolute top-3 left-3 flex flex-col gap-1">
+                      {listing.is_taken && (
+                        <span className="badge-red text-[10px]">Taken</span>
+                      )}
+                      {isExpired && (
+                        <span className="badge-red text-[10px]">Expired</span>
+                      )}
+                      {!isExpired && !listing.is_taken && (
+                        <span className="badge-green text-[10px]">Active</span>
+                      )}
+                    </div>
+
+                    {/* Expiry Status Badge */}
+                    <div className="absolute top-3 right-3">
+                      {getExpiryBadge(status, statusText)}
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-4">
+                    <h3 className="font-semibold text-lg mb-1 text-white truncate">
+                      {listing.title}
+                    </h3>
+                    <p className="text-gray-400 text-sm mb-2 flex items-center gap-1">
                       <svg
-                        className="w-16 h-16 text-gray-600"
+                        className="w-4 h-4"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -414,161 +454,121 @@ export default function DashboardPage() {
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          strokeWidth={2}
+                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                         />
                       </svg>
+                      {listing.location}
+                    </p>
+
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-xl">
+                        KSh {listing.price?.toLocaleString()}
+                      </p>
+                      <p className="text-[10px] text-gray-500">
+                        Renewals: {listing.renewal_count || 0}
+                      </p>
                     </div>
-                  )}
 
-                  {/* Status Badges */}
-                  <div className="absolute top-3 left-3 flex flex-col gap-1">
-                    {listing.is_taken && (
-                      <span className="badge-red text-[10px]">Taken</span>
-                    )}
-                    {isExpired && (
-                      <span className="badge-red text-[10px]">Expired</span>
-                    )}
-                    {!isExpired && !listing.is_taken && (
-                      <span className="badge-green text-[10px]">Active</span>
-                    )}
-                  </div>
-
-                  {/* Expiry Status Badge */}
-                  <div className="absolute top-3 right-3">
-                    {getExpiryBadge(status, statusText)}
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-4">
-                  <h3 className="font-semibold text-lg mb-1 text-white truncate">
-                    {listing.title}
-                  </h3>
-                  <p className="text-gray-400 text-sm mb-2 flex items-center gap-1">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
-                    {listing.location}
-                  </p>
-
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-xl">
-                      KSh {listing.price?.toLocaleString()}
-                    </p>
-                    <p className="text-[10px] text-gray-500">
-                      Renewals: {listing.renewal_count || 0}
-                    </p>
-                  </div>
-
-                  {/* WhatsApp Verification Status */}
-                  {listing.whatsapp_sent_at && (
-                    <div className="mb-3 text-[10px] text-gray-500">
-                      📱 WhatsApp:{" "}
-                      {listing.whatsapp_replied ? (
-                        <span className="text-green-400">✓ Verified</span>
-                      ) : (
-                        <span className="text-yellow-400">
-                          ⏳ Awaiting reply
-                        </span>
-                      )}
-                      {listing.whatsapp_replied &&
-                        listing.whatsapp_response && (
-                          <span className="ml-1">
-                            (
-                            {listing.whatsapp_response === "yes"
-                              ? "Available"
-                              : "Taken"}
-                            )
+                    {/* WhatsApp Verification Status */}
+                    {listing.whatsapp_sent_at && (
+                      <div className="mb-3 text-[10px] text-gray-500">
+                        📱 WhatsApp:{" "}
+                        {listing.whatsapp_replied ? (
+                          <span className="text-green-400">✓ Verified</span>
+                        ) : (
+                          <span className="text-yellow-400">
+                            ⏳ Awaiting reply
                           </span>
                         )}
-                    </div>
-                  )}
-
-                  {/* Days Remaining */}
-                  {!isExpired &&
-                    !listing.is_taken &&
-                    listing.days_remaining !== undefined && (
-                      <p
-                        className={`text-xs mb-3 ${getExpiryStatusColor(status)}`}
-                      >
-                        {status === "active" &&
-                          `✅ ${listing.days_remaining} days remaining`}
-                        {status === "needs_confirmation" &&
-                          `⏰ ${listing.days_remaining} days remaining - Please confirm availability`}
-                        {status === "warning" &&
-                          `⚠️ ${listing.days_remaining} days remaining - Expiring soon!`}
-                      </p>
+                        {listing.whatsapp_replied &&
+                          listing.whatsapp_response && (
+                            <span className="ml-1">
+                              (
+                              {listing.whatsapp_response === "yes"
+                                ? "Available"
+                                : "Taken"}
+                              )
+                            </span>
+                          )}
+                      </div>
                     )}
 
-                  {/* Actions */}
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      to={`/edit-listing/${listing.id}`}
-                      className="flex-1 text-center bg-white/5 hover:bg-white/10 text-gray-300 py-2 rounded-xl border border-white/10 hover:border-blue-500/30 transition-all duration-300 text-sm"
-                    >
-                      Edit
-                    </Link>
+                    {/* Days Remaining */}
+                    {!isExpired &&
+                      !listing.is_taken &&
+                      listing.days_remaining !== undefined && (
+                        <p
+                          className={`text-xs mb-3 ${getExpiryStatusColor(status)}`}
+                        >
+                          {status === "active" &&
+                            `✅ ${listing.days_remaining} days remaining`}
+                          {status === "needs_confirmation" &&
+                            `⏰ ${listing.days_remaining} days remaining - Please confirm availability`}
+                          {status === "warning" &&
+                            `⚠️ ${listing.days_remaining} days remaining - Expiring soon!`}
+                        </p>
+                      )}
 
-                    {/* Confirm/Renew Button */}
-                    {!isExpired && !listing.is_taken && (
+                    {/* Actions */}
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        to={`/edit-listing/${listing.id}`}
+                        className="flex-1 text-center bg-white/5 hover:bg-white/10 text-gray-300 py-2 rounded-xl border border-white/10 hover:border-blue-500/30 transition-all duration-300 text-sm"
+                      >
+                        Edit
+                      </Link>
+
+                      {/* Confirm/Renew Button */}
+                      {!isExpired && !listing.is_taken && (
+                        <button
+                          onClick={() => handleConfirm(listing.id)}
+                          disabled={confirmingId === listing.id}
+                          className={`flex-1 py-2 rounded-xl transition-all duration-300 text-sm ${
+                            status === "active"
+                              ? "bg-blue-500/20 text-blue-400 border border-blue-500/20 hover:bg-blue-500/30"
+                              : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/30 animate-pulse"
+                          }`}
+                        >
+                          {confirmingId === listing.id ? "..." : "Renew"}
+                        </button>
+                      )}
+
                       <button
-                        onClick={() => handleConfirm(listing.id)}
-                        disabled={confirmingId === listing.id}
+                        onClick={() => handleToggleTaken(listing.id)}
+                        disabled={togglingId === listing.id || isExpired}
                         className={`flex-1 py-2 rounded-xl transition-all duration-300 text-sm ${
-                          status === "active"
-                            ? "bg-blue-500/20 text-blue-400 border border-blue-500/20 hover:bg-blue-500/30"
-                            : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/30 animate-pulse"
+                          isExpired
+                            ? "bg-gray-500/20 text-gray-400 cursor-not-allowed"
+                            : listing.is_taken
+                              ? "bg-green-500/20 text-green-400 border border-green-500/20 hover:bg-green-500/30"
+                              : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/30"
                         }`}
                       >
-                        {confirmingId === listing.id ? "..." : "Renew"}
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => handleToggleTaken(listing.id)}
-                      disabled={togglingId === listing.id || isExpired}
-                      className={`flex-1 py-2 rounded-xl transition-all duration-300 text-sm ${
-                        isExpired
-                          ? "bg-gray-500/20 text-gray-400 cursor-not-allowed"
+                        {togglingId === listing.id
+                          ? "..."
                           : listing.is_taken
-                            ? "bg-green-500/20 text-green-400 border border-green-500/20 hover:bg-green-500/30"
-                            : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/30"
-                      }`}
-                    >
-                      {togglingId === listing.id
-                        ? "..."
-                        : listing.is_taken
-                          ? "Mark Available"
-                          : "Mark Taken"}
-                    </button>
+                            ? "Mark Available"
+                            : "Mark Taken"}
+                      </button>
 
-                    <button
-                      onClick={() => handleDelete(listing.id)}
-                      disabled={deletingId === listing.id}
-                      className="flex-1 bg-red-500/20 text-red-400 border border-red-500/20 hover:bg-red-500/30 py-2 rounded-xl transition-all duration-300 text-sm"
-                    >
-                      {deletingId === listing.id ? "..." : "Delete"}
-                    </button>
+                      <button
+                        onClick={() => handleDelete(listing.id)}
+                        disabled={deletingId === listing.id}
+                        className="flex-1 bg-red-500/20 text-red-400 border border-red-500/20 hover:bg-red-500/30 py-2 rounded-xl transition-all duration-300 text-sm"
+                      >
+                        {deletingId === listing.id ? "..." : "Delete"}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </SimpleAmbientBackground>
             );
           })}
         </div>

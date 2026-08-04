@@ -10,6 +10,7 @@ import ReviewSection from "../components/ReviewSection";
 import WhatsAppButton from "../components/WhatsAppButton";
 import CredibilityBadge from "../components/CredibilityBadge";
 import SafetyTip from "../components/SafetyTip";
+import SimpleAmbientBackground from "../components/SimpleAmbientBackground";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -351,64 +352,138 @@ export default function ListingDetailPage() {
     );
   };
 
+  // Get cover image for ambient background
+  const coverImage = hasImages ? listing.images[0].url : null;
+
   return (
-    <div className="max-w-4xl mx-auto pb-8">
-      {/* Image Gallery */}
-      <div className="bg-black rounded-2xl border border-white/10 overflow-hidden mb-6">
-        {hasImages ? (
-          <div>
-            <div
-              className="relative cursor-pointer group"
-              onClick={() => openImageSwiper(0)}
-            >
-              <img
-                src={getOptimizedImageUrl(listing.images[0].url, 800, 600)}
-                alt={listing.title}
-                className="w-full h-[400px] object-cover"
-                loading="eager"
-              />
+    <SimpleAmbientBackground
+      imageUrl={coverImage}
+      intensity={0.3}
+      blur={80}
+      className="min-h-screen"
+    >
+      <div className="max-w-4xl mx-auto pb-8">
+        {/* Image Gallery */}
+        <div className="bg-black/30 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden mb-6">
+          {hasImages ? (
+            <div>
+              <div
+                className="relative cursor-pointer group"
+                onClick={() => openImageSwiper(0)}
+              >
+                <img
+                  src={getOptimizedImageUrl(listing.images[0].url, 800, 600)}
+                  alt={listing.title}
+                  className="w-full h-[400px] object-cover"
+                  loading="eager"
+                />
+                {listing.images.length > 1 && (
+                  <div className="absolute bottom-4 right-4 bg-black/60 text-white text-sm px-3 py-1 rounded-full">
+                    {listing.images.length} photos
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
+                  <span className="opacity-0 group-hover:opacity-100 text-white text-sm bg-black/50 px-3 py-1 rounded-full transition">
+                    Tap to view gallery
+                  </span>
+                </div>
+              </div>
               {listing.images.length > 1 && (
-                <div className="absolute bottom-4 right-4 bg-black/60 text-white text-sm px-3 py-1 rounded-full">
-                  {listing.images.length} photos
+                <div className="flex gap-2 p-2 overflow-x-auto">
+                  {listing.images.slice(0, 5).map((image, idx) => (
+                    <button
+                      key={image.id}
+                      onClick={() => openImageSwiper(idx)}
+                      className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 transition"
+                    >
+                      <img
+                        src={getThumbnailUrl(image.url)}
+                        alt={`Thumb ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </button>
+                  ))}
+                  {listing.images.length > 5 && (
+                    <button
+                      onClick={() => openImageSwiper(5)}
+                      className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-[#1a1a1a] flex items-center justify-center text-white text-sm border border-white/10 hover:border-blue-500 transition"
+                    >
+                      +{listing.images.length - 5}
+                    </button>
+                  )}
                 </div>
               )}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
-                <span className="opacity-0 group-hover:opacity-100 text-white text-sm bg-black/50 px-3 py-1 rounded-full transition">
-                  Tap to view gallery
-                </span>
-              </div>
             </div>
-            {listing.images.length > 1 && (
-              <div className="flex gap-2 p-2 overflow-x-auto">
-                {listing.images.slice(0, 5).map((image, idx) => (
-                  <button
-                    key={image.id}
-                    onClick={() => openImageSwiper(idx)}
-                    className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 transition"
-                  >
-                    <img
-                      src={getThumbnailUrl(image.url)}
-                      alt={`Thumb ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                  </button>
-                ))}
-                {listing.images.length > 5 && (
-                  <button
-                    onClick={() => openImageSwiper(5)}
-                    className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-[#1a1a1a] flex items-center justify-center text-white text-sm border border-white/10 hover:border-blue-500 transition"
-                  >
-                    +{listing.images.length - 5}
-                  </button>
+          ) : (
+            <div className="h-[400px] bg-[#0a0a0a] flex items-center justify-center">
+              <svg
+                className="w-24 h-24 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+          )}
+        </div>
+
+        {/* Image Swiper Modal */}
+        {swiperOpen && hasImages && (
+          <ImageSwiper
+            images={listing.images.map((img) => ({
+              ...img,
+              url: getOptimizedImageUrl(img.url, 1200, 900),
+            }))}
+            onClose={() => setSwiperOpen(false)}
+          />
+        )}
+
+        {/* Listing Details */}
+        <div className="bg-black/30 backdrop-blur-sm rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
+          <SafetyTip page="detail" className="mb-4" />
+
+          {/* Title & Status */}
+          <div className="flex justify-between items-start mb-4">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">
+              {listing.title}
+            </h1>
+            <div className="flex flex-col items-end gap-1">
+              {listing.is_taken && <span className="badge-red">Taken</span>}
+              {isExpired && <span className="badge-red">Expired</span>}
+              {!isExpired && !listing.is_taken && (
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full border ${
+                    expiryStatus === "active"
+                      ? "border-green-500/30 text-green-400 bg-green-500/10"
+                      : expiryStatus === "needs_confirmation"
+                        ? "border-yellow-500/30 text-yellow-400 bg-yellow-500/10"
+                        : "border-orange-500/30 text-orange-400 bg-orange-500/10"
+                  }`}
+                >
+                  {expiryStatusText}
+                </span>
+              )}
+              {!isExpired &&
+                !listing.is_taken &&
+                daysRemaining !== undefined && (
+                  <span className="text-[10px] text-gray-500">
+                    {daysRemaining} days remaining
+                  </span>
                 )}
-              </div>
-            )}
+            </div>
           </div>
-        ) : (
-          <div className="h-[400px] bg-[#0a0a0a] flex items-center justify-center">
+
+          {/* Location */}
+          <div className="flex items-center gap-2 text-gray-400 text-sm mb-4">
             <svg
-              className="w-24 h-24 text-gray-700"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -416,167 +491,88 @@ export default function ListingDetailPage() {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={1}
-                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                strokeWidth={2}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
               />
-            </svg>
-          </div>
-        )}
-      </div>
-
-      {/* Image Swiper Modal */}
-      {swiperOpen && hasImages && (
-        <ImageSwiper
-          images={listing.images.map((img) => ({
-            ...img,
-            url: getOptimizedImageUrl(img.url, 1200, 900),
-          }))}
-          onClose={() => setSwiperOpen(false)}
-        />
-      )}
-
-      {/* Listing Details */}
-      <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
-        <SafetyTip page="detail" className="mb-4" />
-
-        {/* Title & Status */}
-        <div className="flex justify-between items-start mb-4">
-          <h1 className="text-xl sm:text-2xl font-bold text-white">
-            {listing.title}
-          </h1>
-          <div className="flex flex-col items-end gap-1">
-            {listing.is_taken && <span className="badge-red">Taken</span>}
-            {isExpired && <span className="badge-red">Expired</span>}
-            {!isExpired && !listing.is_taken && (
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full border ${
-                  expiryStatus === "active"
-                    ? "border-green-500/30 text-green-400 bg-green-500/10"
-                    : expiryStatus === "needs_confirmation"
-                      ? "border-yellow-500/30 text-yellow-400 bg-yellow-500/10"
-                      : "border-orange-500/30 text-orange-400 bg-orange-500/10"
-                }`}
-              >
-                {expiryStatusText}
-              </span>
-            )}
-            {!isExpired && !listing.is_taken && daysRemaining !== undefined && (
-              <span className="text-[10px] text-gray-500">
-                {daysRemaining} days remaining
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Location */}
-        <div className="flex items-center gap-2 text-gray-400 text-sm mb-4">
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-          </svg>
-          <span>{listing.location}</span>
-          {isLocationVerified && (
-            <span className="text-[10px] text-green-400 ml-1">✅ Verified</span>
-          )}
-        </div>
-
-        {/* Author Credibility Badge */}
-        {author.id && (
-          <div className="mb-4 p-3 bg-black/30 rounded-xl border border-white/5">
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <p className="text-xs text-gray-500">Posted by</p>
-                <p className="font-medium text-white">{author.name}</p>
-              </div>
-              <CredibilityBadge
-                userId={author.id}
-                score={author.credibility_score}
-                badge={author.badge}
-                isVerified={author.is_verified}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Price & True Monthly Cost */}
-        <div className="mb-4">
-          <p className="text-2xl sm:text-3xl font-bold text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text">
-            KSh {listing.price?.toLocaleString()}
-            {listing.price && (
-              <span className="text-sm font-normal text-gray-500">
-                {" "}
-                / month
-              </span>
-            )}
-          </p>
-          {listing.true_monthly_cost &&
-            listing.true_monthly_cost !== listing.price && (
-              <p className="text-xs text-gray-400 mt-1">
-                💰 Total monthly: KSh{" "}
-                {listing.true_monthly_cost.toLocaleString()}
-                (incl. service charge)
-              </p>
-            )}
-        </div>
-
-        {/* Description */}
-        {listing.description && (
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold text-gray-300 mb-2">
-              Description
-            </h3>
-            <p className="text-gray-400 text-sm whitespace-pre-wrap">
-              {listing.description}
-            </p>
-          </div>
-        )}
-
-        {/* Favorite Button */}
-        {isLoggedIn ? (
-          <button
-            onClick={toggleFavorite}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition mb-4 ${
-              isFavorited
-                ? "bg-red-500/20 text-red-400 border border-red-500/20 hover:bg-red-500/30"
-                : "bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
-            }`}
-          >
-            <svg
-              className="w-5 h-5"
-              fill={isFavorited ? "currentColor" : "none"}
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
               />
             </svg>
-            {isFavorited ? "❤️ Saved" : "🤍 Save"}
-          </button>
-        ) : (
-          <Link to="/login" className="inline-block mb-4">
-            <button className="flex items-center gap-2 px-4 py-2 rounded-xl transition bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10">
+            <span>{listing.location}</span>
+            {isLocationVerified && (
+              <span className="text-[10px] text-green-400 ml-1">
+                ✅ Verified
+              </span>
+            )}
+          </div>
+
+          {/* Author Credibility Badge */}
+          {author.id && (
+            <div className="mb-4 p-3 bg-black/30 rounded-xl border border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="text-xs text-gray-500">Posted by</p>
+                  <p className="font-medium text-white">{author.name}</p>
+                </div>
+                <CredibilityBadge
+                  userId={author.id}
+                  score={author.credibility_score}
+                  badge={author.badge}
+                  isVerified={author.is_verified}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Price & True Monthly Cost */}
+          <div className="mb-4">
+            <p className="text-2xl sm:text-3xl font-bold text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text">
+              KSh {listing.price?.toLocaleString()}
+              {listing.price && (
+                <span className="text-sm font-normal text-gray-500">
+                  {" "}
+                  / month
+                </span>
+              )}
+            </p>
+            {listing.true_monthly_cost &&
+              listing.true_monthly_cost !== listing.price && (
+                <p className="text-xs text-gray-400 mt-1">
+                  💰 Total monthly: KSh{" "}
+                  {listing.true_monthly_cost.toLocaleString()}
+                  (incl. service charge)
+                </p>
+              )}
+          </div>
+
+          {/* Description */}
+          {listing.description && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-gray-300 mb-2">
+                Description
+              </h3>
+              <p className="text-gray-400 text-sm whitespace-pre-wrap">
+                {listing.description}
+              </p>
+            </div>
+          )}
+
+          {/* Favorite Button */}
+          {isLoggedIn ? (
+            <button
+              onClick={toggleFavorite}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition mb-4 ${
+                isFavorited
+                  ? "bg-red-500/20 text-red-400 border border-red-500/20 hover:bg-red-500/30"
+                  : "bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
+              }`}
+            >
               <svg
                 className="w-5 h-5"
-                fill="none"
+                fill={isFavorited ? "currentColor" : "none"}
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
@@ -587,450 +583,474 @@ export default function ListingDetailPage() {
                   d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
                 />
               </svg>
-              Login to Save
+              {isFavorited ? "❤️ Saved" : "🤍 Save"}
             </button>
-          </Link>
-        )}
+          ) : (
+            <Link to="/login" className="inline-block mb-4">
+              <button className="flex items-center gap-2 px-4 py-2 rounded-xl transition bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                  />
+                </svg>
+                Login to Save
+              </button>
+            </Link>
+          )}
 
-        {/* ============ LAYER 1: UTILITY & FEES ============ */}
-        {(listing.service_charge > 0 || listing.trash_fee > 0) && (
-          <div className="border-t border-white/10 pt-4 mb-4">
-            <h3 className="text-sm font-semibold text-gray-300 mb-2">
-              💰 Fees & Charges
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              {listing.service_charge > 0 && (
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Service Charge</p>
-                  <p className="font-medium text-white text-sm">
-                    KSh {listing.service_charge.toLocaleString()}
-                  </p>
-                </div>
-              )}
-              {listing.trash_fee > 0 && (
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Trash Fee</p>
-                  <p className="font-medium text-white text-sm">
-                    KSh {listing.trash_fee.toLocaleString()}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ============ LAYER 1: WATER MATRIX ============ */}
-        {(listing.water_source ||
-          listing.water_metering ||
-          listing.water_rationing) && (
-          <div className="border-t border-white/10 pt-4 mb-4">
-            <h3 className="text-sm font-semibold text-gray-300 mb-2">
-              💧 Water Information
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {listing.water_source && (
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Source</p>
-                  <p className="font-medium text-white text-sm">
-                    {listing.water_source_display}
-                  </p>
-                </div>
-              )}
-              {listing.water_metering && (
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Metering</p>
-                  <p className="font-medium text-white text-sm">
-                    {listing.water_metering_display}
-                  </p>
-                </div>
-              )}
-              {listing.water_rationing &&
-                listing.water_rationing !== "none" && (
+          {/* ============ LAYER 1: UTILITY & FEES ============ */}
+          {(listing.service_charge > 0 || listing.trash_fee > 0) && (
+            <div className="border-t border-white/10 pt-4 mb-4">
+              <h3 className="text-sm font-semibold text-gray-300 mb-2">
+                💰 Fees & Charges
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {listing.service_charge > 0 && (
                   <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                    <p className="text-[10px] text-gray-500">Rationing</p>
+                    <p className="text-[10px] text-gray-500">Service Charge</p>
                     <p className="font-medium text-white text-sm">
-                      {listing.water_rationing_display}
+                      KSh {listing.service_charge.toLocaleString()}
                     </p>
                   </div>
                 )}
+                {listing.trash_fee > 0 && (
+                  <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500">Trash Fee</p>
+                    <p className="font-medium text-white text-sm">
+                      KSh {listing.trash_fee.toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ============ LAYER 1: POWER MATRIX ============ */}
-        {(listing.power_metering || listing.backup_power) && (
-          <div className="border-t border-white/10 pt-4 mb-4">
-            <h3 className="text-sm font-semibold text-gray-300 mb-2">
-              ⚡ Power Information
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              {listing.power_metering && (
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Metering</p>
-                  <p className="font-medium text-white text-sm">
-                    {listing.power_metering_display}
-                  </p>
-                </div>
-              )}
-              {listing.backup_power && (
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Backup Power</p>
-                  <p className="font-medium text-white text-sm">
-                    {listing.backup_power_display}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ============ LAYER 1: BUILDING FEATURES ============ */}
-        {(listing.has_lift ||
-          listing.has_cctv ||
-          listing.has_balcony ||
-          listing.has_rooftop ||
-          listing.has_parking ||
-          listing.has_fence) && (
-          <div className="border-t border-white/10 pt-4 mb-4">
-            <h3 className="text-sm font-semibold text-gray-300 mb-2">
-              🏢 Building Features
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {renderFeature("Elevator/Lift", listing.has_lift)}
-              {renderFeature("CCTV", listing.has_cctv)}
-              {renderFeature("Balcony", listing.has_balcony)}
-              {renderFeature("Rooftop Access", listing.has_rooftop)}
-              {renderFeature("Dedicated Parking", listing.has_parking)}
-              {renderFeature("Perimeter Fence", listing.has_fence)}
-            </div>
-          </div>
-        )}
-
-        {/* ============ LAYER 1: COMMUTE & LOGISTICS ============ */}
-        {(listing.matatu_distance ||
-          listing.matatu_walk_time ||
-          listing.fare_cbd_offpeak ||
-          listing.fare_cbd_peak ||
-          listing.supermarket_distance ||
-          listing.gym_distance) && (
-          <div className="border-t border-white/10 pt-4 mb-4">
-            <h3 className="text-sm font-semibold text-gray-300 mb-2">
-              🚌 Commute & Logistics
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {listing.matatu_distance && (
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Matatu Distance</p>
-                  <p className="font-medium text-white text-sm">
-                    {listing.matatu_distance}m
-                  </p>
-                </div>
-              )}
-              {listing.matatu_walk_time && (
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Walk Time</p>
-                  <p className="font-medium text-white text-sm">
-                    {listing.matatu_walk_time} min
-                  </p>
-                </div>
-              )}
-              {listing.fare_cbd_offpeak && (
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">
-                    Fare to CBD (Off-peak)
-                  </p>
-                  <p className="font-medium text-white text-sm">
-                    KSh {listing.fare_cbd_offpeak}
-                  </p>
-                </div>
-              )}
-              {listing.fare_cbd_peak && (
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">
-                    Fare to CBD (Peak)
-                  </p>
-                  <p className="font-medium text-white text-sm">
-                    KSh {listing.fare_cbd_peak}
-                  </p>
-                </div>
-              )}
-              {listing.supermarket_distance && (
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Supermarket</p>
-                  <p className="font-medium text-white text-sm">
-                    {listing.supermarket_distance}m
-                  </p>
-                </div>
-              )}
-              {listing.gym_distance && (
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Gym</p>
-                  <p className="font-medium text-white text-sm">
-                    {listing.gym_distance}m
-                  </p>
-                </div>
-              )}
-            </div>
-            {listing.food_delivery_available && (
-              <p className="text-xs text-green-400 mt-2">
-                ✅ Food delivery available (Bolt/Uber Eats)
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* ============ MAP DISPLAY ============ */}
-        {hasLocation && mapLocation && (
-          <div className="border-t border-white/10 pt-4 mb-4">
-            <h3 className="text-sm font-semibold text-gray-300 mb-2">
-              📍 Property Location
-              {isLocationVerified && (
-                <span className="text-[10px] text-green-400 ml-2">
-                  ✅ Verified
-                </span>
-              )}
-            </h3>
-            <div className="rounded-xl overflow-hidden border border-white/10 h-[250px]">
-              <MapContainer
-                center={[mapLocation.lat, mapLocation.lng]}
-                zoom={15}
-                style={{ height: "100%", width: "100%" }}
-                zoomControl={true}
-                attributionControl={true}
-              >
-                <TileLayer
-                  attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <Marker
-                  position={[mapLocation.lat, mapLocation.lng]}
-                  icon={isLocationVerified ? verifiedPinIcon : undefined}
-                >
-                  <Popup>
-                    <div className="text-sm">
-                      <p className="font-semibold">{listing.title}</p>
-                      <p className="text-gray-500 text-xs">
-                        {listing.location}
+          {/* ============ LAYER 1: WATER MATRIX ============ */}
+          {(listing.water_source ||
+            listing.water_metering ||
+            listing.water_rationing) && (
+            <div className="border-t border-white/10 pt-4 mb-4">
+              <h3 className="text-sm font-semibold text-gray-300 mb-2">
+                💧 Water Information
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {listing.water_source && (
+                  <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500">Source</p>
+                    <p className="font-medium text-white text-sm">
+                      {listing.water_source_display}
+                    </p>
+                  </div>
+                )}
+                {listing.water_metering && (
+                  <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500">Metering</p>
+                    <p className="font-medium text-white text-sm">
+                      {listing.water_metering_display}
+                    </p>
+                  </div>
+                )}
+                {listing.water_rationing &&
+                  listing.water_rationing !== "none" && (
+                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                      <p className="text-[10px] text-gray-500">Rationing</p>
+                      <p className="font-medium text-white text-sm">
+                        {listing.water_rationing_display}
                       </p>
-                      {isLocationVerified && (
-                        <p className="text-green-400 text-xs mt-1">
-                          ✅ Location Verified
-                        </p>
-                      )}
                     </div>
-                  </Popup>
-                </Marker>
-                <Circle
+                  )}
+              </div>
+            </div>
+          )}
+
+          {/* ============ LAYER 1: POWER MATRIX ============ */}
+          {(listing.power_metering || listing.backup_power) && (
+            <div className="border-t border-white/10 pt-4 mb-4">
+              <h3 className="text-sm font-semibold text-gray-300 mb-2">
+                ⚡ Power Information
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {listing.power_metering && (
+                  <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500">Metering</p>
+                    <p className="font-medium text-white text-sm">
+                      {listing.power_metering_display}
+                    </p>
+                  </div>
+                )}
+                {listing.backup_power && (
+                  <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500">Backup Power</p>
+                    <p className="font-medium text-white text-sm">
+                      {listing.backup_power_display}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ============ LAYER 1: BUILDING FEATURES ============ */}
+          {(listing.has_lift ||
+            listing.has_cctv ||
+            listing.has_balcony ||
+            listing.has_rooftop ||
+            listing.has_parking ||
+            listing.has_fence) && (
+            <div className="border-t border-white/10 pt-4 mb-4">
+              <h3 className="text-sm font-semibold text-gray-300 mb-2">
+                🏢 Building Features
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {renderFeature("Elevator/Lift", listing.has_lift)}
+                {renderFeature("CCTV", listing.has_cctv)}
+                {renderFeature("Balcony", listing.has_balcony)}
+                {renderFeature("Rooftop Access", listing.has_rooftop)}
+                {renderFeature("Dedicated Parking", listing.has_parking)}
+                {renderFeature("Perimeter Fence", listing.has_fence)}
+              </div>
+            </div>
+          )}
+
+          {/* ============ LAYER 1: COMMUTE & LOGISTICS ============ */}
+          {(listing.matatu_distance ||
+            listing.matatu_walk_time ||
+            listing.fare_cbd_offpeak ||
+            listing.fare_cbd_peak ||
+            listing.supermarket_distance ||
+            listing.gym_distance) && (
+            <div className="border-t border-white/10 pt-4 mb-4">
+              <h3 className="text-sm font-semibold text-gray-300 mb-2">
+                🚌 Commute & Logistics
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {listing.matatu_distance && (
+                  <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500">Matatu Distance</p>
+                    <p className="font-medium text-white text-sm">
+                      {listing.matatu_distance}m
+                    </p>
+                  </div>
+                )}
+                {listing.matatu_walk_time && (
+                  <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500">Walk Time</p>
+                    <p className="font-medium text-white text-sm">
+                      {listing.matatu_walk_time} min
+                    </p>
+                  </div>
+                )}
+                {listing.fare_cbd_offpeak && (
+                  <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500">
+                      Fare to CBD (Off-peak)
+                    </p>
+                    <p className="font-medium text-white text-sm">
+                      KSh {listing.fare_cbd_offpeak}
+                    </p>
+                  </div>
+                )}
+                {listing.fare_cbd_peak && (
+                  <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500">
+                      Fare to CBD (Peak)
+                    </p>
+                    <p className="font-medium text-white text-sm">
+                      KSh {listing.fare_cbd_peak}
+                    </p>
+                  </div>
+                )}
+                {listing.supermarket_distance && (
+                  <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500">Supermarket</p>
+                    <p className="font-medium text-white text-sm">
+                      {listing.supermarket_distance}m
+                    </p>
+                  </div>
+                )}
+                {listing.gym_distance && (
+                  <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                    <p className="text-[10px] text-gray-500">Gym</p>
+                    <p className="font-medium text-white text-sm">
+                      {listing.gym_distance}m
+                    </p>
+                  </div>
+                )}
+              </div>
+              {listing.food_delivery_available && (
+                <p className="text-xs text-green-400 mt-2">
+                  ✅ Food delivery available (Bolt/Uber Eats)
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ============ MAP DISPLAY ============ */}
+          {hasLocation && mapLocation && (
+            <div className="border-t border-white/10 pt-4 mb-4">
+              <h3 className="text-sm font-semibold text-gray-300 mb-2">
+                📍 Property Location
+                {isLocationVerified && (
+                  <span className="text-[10px] text-green-400 ml-2">
+                    ✅ Verified
+                  </span>
+                )}
+              </h3>
+              <div className="rounded-xl overflow-hidden border border-white/10 h-[250px]">
+                <MapContainer
                   center={[mapLocation.lat, mapLocation.lng]}
-                  radius={500}
-                  pathOptions={{
-                    color: isLocationVerified ? "green" : "blue",
-                    fillOpacity: 0.1,
-                  }}
-                />
-              </MapContainer>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <span className="text-[10px] text-gray-500">
-                📍{" "}
-                {mapLocation.source === "pin" ? "Pin location" : "GPS location"}
-              </span>
-              {listing.matatu_distance && (
-                <span className="text-[10px] text-gray-500">
-                  🚌 Matatu: {listing.matatu_distance}m
-                </span>
-              )}
-              {listing.supermarket_distance && (
-                <span className="text-[10px] text-gray-500">
-                  🛒 Supermarket: {listing.supermarket_distance}m
-                </span>
-              )}
-              {listing.gym_distance && (
-                <span className="text-[10px] text-gray-500">
-                  💪 Gym: {listing.gym_distance}m
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Property Details (Basic) */}
-        <div className="border-t border-white/10 pt-4 mb-6">
-          <h3 className="text-sm font-semibold text-gray-300 mb-3">
-            Property Details
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-              <p className="text-[10px] text-gray-500">Property Type</p>
-              <p className="font-medium text-white text-sm">
-                {listing.house_type_display}
-              </p>
-            </div>
-            <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-              <p className="text-[10px] text-gray-500">Posted By</p>
-              <p className="font-medium text-white text-sm">
-                {listing.author?.name}
-              </p>
-            </div>
-            <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-              <p className="text-[10px] text-gray-500">Posted On</p>
-              <p className="font-medium text-white text-sm">
-                {new Date(listing.created_at).toLocaleDateString()}
-              </p>
-            </div>
-            <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-              <p className="text-[10px] text-gray-500">Status</p>
-              <p
-                className={`font-medium text-sm ${listing.is_taken ? "text-red-400" : "text-green-400"}`}
-              >
-                {listing.is_taken ? "Taken" : "Available"}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Contact Section with WhatsApp */}
-        <div className="border-t border-white/10 pt-6">
-          <SafetyTip page="contact" className="mb-4" />
-
-          {!showContact ? (
-            <button onClick={handleContactClick} className="w-full btn-primary">
-              📞 Reveal Contact Number
-            </button>
-          ) : (
-            <div className="space-y-3">
-              <div className="bg-black/50 border border-white/10 rounded-xl p-4 text-center">
-                <p className="text-sm text-gray-400 mb-2">Contact Seller</p>
-                <div className="flex items-center justify-center gap-3">
-                  <a
-                    href={`tel:${listing.contact_phone}`}
-                    className="text-blue-400 font-semibold text-lg hover:text-blue-300 transition"
+                  zoom={15}
+                  style={{ height: "100%", width: "100%" }}
+                  zoomControl={true}
+                  attributionControl={true}
+                >
+                  <TileLayer
+                    attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker
+                    position={[mapLocation.lat, mapLocation.lng]}
+                    icon={isLocationVerified ? verifiedPinIcon : undefined}
                   >
-                    {listing.contact_phone}
-                  </a>
-                  <button
-                    onClick={handleCopyPhone}
-                    className="text-gray-400 hover:text-white transition"
-                    title="Copy to clipboard"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </button>
-                </div>
-                <p className="text-[10px] text-gray-500 mt-2">
-                  Click to call or copy the number
+                    <Popup>
+                      <div className="text-sm">
+                        <p className="font-semibold">{listing.title}</p>
+                        <p className="text-gray-500 text-xs">
+                          {listing.location}
+                        </p>
+                        {isLocationVerified && (
+                          <p className="text-green-400 text-xs mt-1">
+                            ✅ Location Verified
+                          </p>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                  <Circle
+                    center={[mapLocation.lat, mapLocation.lng]}
+                    radius={500}
+                    pathOptions={{
+                      color: isLocationVerified ? "green" : "blue",
+                      fillOpacity: 0.1,
+                    }}
+                  />
+                </MapContainer>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <span className="text-[10px] text-gray-500">
+                  📍{" "}
+                  {mapLocation.source === "pin"
+                    ? "Pin location"
+                    : "GPS location"}
+                </span>
+                {listing.matatu_distance && (
+                  <span className="text-[10px] text-gray-500">
+                    🚌 Matatu: {listing.matatu_distance}m
+                  </span>
+                )}
+                {listing.supermarket_distance && (
+                  <span className="text-[10px] text-gray-500">
+                    🛒 Supermarket: {listing.supermarket_distance}m
+                  </span>
+                )}
+                {listing.gym_distance && (
+                  <span className="text-[10px] text-gray-500">
+                    💪 Gym: {listing.gym_distance}m
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Property Details (Basic) */}
+          <div className="border-t border-white/10 pt-4 mb-6">
+            <h3 className="text-sm font-semibold text-gray-300 mb-3">
+              Property Details
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                <p className="text-[10px] text-gray-500">Property Type</p>
+                <p className="font-medium text-white text-sm">
+                  {listing.house_type_display}
                 </p>
               </div>
-
-              {/* WhatsApp Button */}
-              <WhatsAppButton
-                listingId={listing.id}
-                userPhone={listing.contact_phone}
-                listingTitle={listing.title}
-                listingPrice={listing.price}
-              />
-
-              <SafetyTip page="whatsapp" className="mt-3" />
+              <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                <p className="text-[10px] text-gray-500">Posted By</p>
+                <p className="font-medium text-white text-sm">
+                  {listing.author?.name}
+                </p>
+              </div>
+              <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                <p className="text-[10px] text-gray-500">Posted On</p>
+                <p className="font-medium text-white text-sm">
+                  {new Date(listing.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="bg-black/50 border border-white/5 rounded-xl p-3">
+                <p className="text-[10px] text-gray-500">Status</p>
+                <p
+                  className={`font-medium text-sm ${listing.is_taken ? "text-red-400" : "text-green-400"}`}
+                >
+                  {listing.is_taken ? "Taken" : "Available"}
+                </p>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* ============ Review Section ============ */}
-        <div className="mt-6 border-t border-white/10 pt-6">
-          <ReviewSection
-            listingId={listing.id}
-            listingTitle={listing.title}
-            reviews={reviewsData}
-            isLoading={reviewsLoading}
-            isLoggedIn={isLoggedIn}
-            userId={user?.id}
-            onReviewSubmitted={handleReviewSubmitted}
-          />
-        </div>
+          {/* Contact Section with WhatsApp */}
+          <div className="border-t border-white/10 pt-6">
+            <SafetyTip page="contact" className="mb-4" />
 
-        {/* Comments Section */}
-        <div className="bg-black rounded-2xl border border-white/10 p-4 sm:p-6 mt-6">
-          <h3 className="text-lg font-semibold text-white mb-4">
-            💬 Comments
-            {commentsData && (
-              <span className="text-sm text-gray-500 ml-2">
-                ({commentsData.total})
-              </span>
-            )}
-          </h3>
-
-          {/* Comment Input */}
-          {isLoggedIn ? (
-            <form onSubmit={handleCommentSubmit} className="flex gap-3 mb-6">
-              <input
-                type="text"
-                value={commentContent}
-                onChange={(e) => setCommentContent(e.target.value)}
-                placeholder="Write a comment..."
-                className="flex-1 input"
-                disabled={isCommenting}
-              />
+            {!showContact ? (
               <button
-                type="submit"
-                disabled={isCommenting || !commentContent.trim()}
-                className="btn-primary px-6 disabled:opacity-50"
+                onClick={handleContactClick}
+                className="w-full btn-primary"
               >
-                {isCommenting ? "Posting..." : "💬 Post"}
+                📞 Reveal Contact Number
               </button>
-            </form>
-          ) : (
-            <div className="bg-black/50 border border-white/10 rounded-xl p-4 mb-6 text-center">
-              <p className="text-gray-400 text-sm mb-2">
-                Want to join the conversation?
-              </p>
-              <div className="flex justify-center gap-3">
-                <Link to="/login" className="btn-primary text-sm">
-                  Login
-                </Link>
-                <Link to="/register" className="btn-outline text-sm">
-                  Register
-                </Link>
-              </div>
-              <p className="text-[10px] text-gray-500 mt-2">
-                Login or register to comment on this listing
-              </p>
-            </div>
-          )}
-
-          {/* Comments List */}
-          <div className="space-y-4">
-            {commentsLoading ? (
-              <div className="flex justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-              </div>
-            ) : commentsData?.comments?.length > 0 ? (
-              commentsData.comments.map((comment) => (
-                <CommentItem
-                  key={comment.id}
-                  comment={comment}
-                  listingId={id}
-                  onReply={refetchComments}
-                />
-              ))
             ) : (
-              <p className="text-gray-500 text-center py-4 text-sm">
-                No comments yet. Be the first to comment!
-              </p>
+              <div className="space-y-3">
+                <div className="bg-black/50 border border-white/10 rounded-xl p-4 text-center">
+                  <p className="text-sm text-gray-400 mb-2">Contact Seller</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <a
+                      href={`tel:${listing.contact_phone}`}
+                      className="text-blue-400 font-semibold text-lg hover:text-blue-300 transition"
+                    >
+                      {listing.contact_phone}
+                    </a>
+                    <button
+                      onClick={handleCopyPhone}
+                      className="text-gray-400 hover:text-white transition"
+                      title="Copy to clipboard"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-2">
+                    Click to call or copy the number
+                  </p>
+                </div>
+
+                {/* WhatsApp Button */}
+                <WhatsAppButton
+                  listingId={listing.id}
+                  userPhone={listing.contact_phone}
+                  listingTitle={listing.title}
+                  listingPrice={listing.price}
+                />
+
+                <SafetyTip page="whatsapp" className="mt-3" />
+              </div>
             )}
+          </div>
+
+          {/* ============ Review Section ============ */}
+          <div className="mt-6 border-t border-white/10 pt-6">
+            <ReviewSection
+              listingId={listing.id}
+              listingTitle={listing.title}
+              reviews={reviewsData}
+              isLoading={reviewsLoading}
+              isLoggedIn={isLoggedIn}
+              userId={user?.id}
+              onReviewSubmitted={handleReviewSubmitted}
+            />
+          </div>
+
+          {/* Comments Section */}
+          <div className="bg-black/30 backdrop-blur-sm rounded-2xl border border-white/10 p-4 sm:p-6 mt-6">
+            <h3 className="text-lg font-semibold text-white mb-4">
+              💬 Comments
+              {commentsData && (
+                <span className="text-sm text-gray-500 ml-2">
+                  ({commentsData.total})
+                </span>
+              )}
+            </h3>
+
+            {/* Comment Input */}
+            {isLoggedIn ? (
+              <form onSubmit={handleCommentSubmit} className="flex gap-3 mb-6">
+                <input
+                  type="text"
+                  value={commentContent}
+                  onChange={(e) => setCommentContent(e.target.value)}
+                  placeholder="Write a comment..."
+                  className="flex-1 input"
+                  disabled={isCommenting}
+                />
+                <button
+                  type="submit"
+                  disabled={isCommenting || !commentContent.trim()}
+                  className="btn-primary px-6 disabled:opacity-50"
+                >
+                  {isCommenting ? "Posting..." : "💬 Post"}
+                </button>
+              </form>
+            ) : (
+              <div className="bg-black/50 border border-white/10 rounded-xl p-4 mb-6 text-center">
+                <p className="text-gray-400 text-sm mb-2">
+                  Want to join the conversation?
+                </p>
+                <div className="flex justify-center gap-3">
+                  <Link to="/login" className="btn-primary text-sm">
+                    Login
+                  </Link>
+                  <Link to="/register" className="btn-outline text-sm">
+                    Register
+                  </Link>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2">
+                  Login or register to comment on this listing
+                </p>
+              </div>
+            )}
+
+            {/* Comments List */}
+            <div className="space-y-4">
+              {commentsLoading ? (
+                <div className="flex justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                </div>
+              ) : commentsData?.comments?.length > 0 ? (
+                commentsData.comments.map((comment) => (
+                  <CommentItem
+                    key={comment.id}
+                    comment={comment}
+                    listingId={id}
+                    onReply={refetchComments}
+                  />
+                ))
+              ) : (
+                <p className="text-gray-500 text-center py-4 text-sm">
+                  No comments yet. Be the first to comment!
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </SimpleAmbientBackground>
   );
 }

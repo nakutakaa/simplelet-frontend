@@ -5,6 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import API from "../services/api";
 import toast from "react-hot-toast";
 import SafetyTip from "../components/SafetyTip";
+import SimpleAmbientBackground from "../components/SimpleAmbientBackground";
 
 // House types for filter dropdown
 const HOUSE_TYPES = [
@@ -242,7 +243,6 @@ export default function HomePage() {
     <div className="space-y-4 sm:space-y-6">
       {/* Search and Filter Bar */}
       <div className="bg-black rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
-        {/* ============ SAFETY TIP ============ */}
         <SafetyTip page="search" className="mb-4" />
 
         <form onSubmit={handleSearchSubmit} className="space-y-3 sm:space-y-4">
@@ -345,7 +345,6 @@ export default function HomePage() {
 
           {/* ============ NEARBY SEARCH BUTTON ============ */}
           <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-white/10">
-            {/* ============ SAFETY TIP ============ */}
             <SafetyTip page="price" className="w-full mb-2" />
 
             <button
@@ -513,22 +512,83 @@ export default function HomePage() {
                 );
 
               return (
-                <Link key={listing.id} to={`/listing/${listing.id}`}>
-                  <div
-                    className={`card group ${isExpired ? "opacity-60" : ""}`}
-                  >
-                    <div className="aspect-[4/3] bg-[#0a0a0a] overflow-hidden relative">
-                      {listing.cover_image ? (
-                        <img
-                          src={listing.cover_image}
-                          alt={listing.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
+                <SimpleAmbientBackground
+                  key={listing.id}
+                  imageUrl={listing.cover_image}
+                  intensity={0.2}
+                  blur={40}
+                  className="rounded-xl overflow-hidden transition-colors duration-700"
+                >
+                  <Link to={`/listing/${listing.id}`}>
+                    <div
+                      className={`card group ${isExpired ? "opacity-60" : ""}`}
+                    >
+                      <div className="aspect-[4/3] bg-[#0a0a0a] overflow-hidden relative">
+                        {listing.cover_image ? (
+                          <img
+                            src={listing.cover_image}
+                            alt={listing.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <svg
+                              className="w-12 h-12 sm:w-16 sm:h-16 text-gray-700"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </div>
+                        )}
+
+                        {/* Status Badge on Image */}
+                        {listing.is_taken ? (
+                          <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
+                            Taken
+                          </span>
+                        ) : isExpired ? (
+                          <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
+                            Expired
+                          </span>
+                        ) : (
+                          <span
+                            className={`absolute top-2 right-2 ${expiry.bg} ${expiry.color} text-[10px] px-2 py-0.5 rounded-full border border-current/20`}
+                          >
+                            {expiry.label}
+                          </span>
+                        )}
+
+                        {/* Credibility Badge on Image */}
+                        {hasBadge && (
+                          <span className="absolute top-2 left-2 text-xs">
+                            {getCredibilityBadge(hasBadge)}
+                          </span>
+                        )}
+
+                        {/* Similar Type Badge */}
+                        {isSimilar && (
+                          <span className="absolute bottom-2 left-2 bg-blue-500/80 text-white text-[8px] px-2 py-0.5 rounded-full">
+                            Similar
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="p-3 sm:p-4">
+                        <h3 className="font-semibold text-sm sm:text-base mb-0.5 line-clamp-1 text-white group-hover:text-blue-400 transition">
+                          {listing.title}
+                        </h3>
+
+                        <p className="text-gray-500 text-xs sm:text-sm mb-1.5 flex items-center gap-1">
                           <svg
-                            className="w-12 h-12 sm:w-16 sm:h-16 text-gray-700"
+                            className="w-3 h-3 sm:w-4 sm:h-4"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -536,99 +596,46 @@ export default function HomePage() {
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              strokeWidth={2}
+                              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                             />
                           </svg>
-                        </div>
-                      )}
-
-                      {/* Status Badge on Image */}
-                      {listing.is_taken ? (
-                        <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
-                          Taken
-                        </span>
-                      ) : isExpired ? (
-                        <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
-                          Expired
-                        </span>
-                      ) : (
-                        <span
-                          className={`absolute top-2 right-2 ${expiry.bg} ${expiry.color} text-[10px] px-2 py-0.5 rounded-full border border-current/20`}
-                        >
-                          {expiry.label}
-                        </span>
-                      )}
-
-                      {/* Credibility Badge on Image */}
-                      {hasBadge && (
-                        <span className="absolute top-2 left-2 text-xs">
-                          {getCredibilityBadge(hasBadge)}
-                        </span>
-                      )}
-
-                      {/* Similar Type Badge */}
-                      {isSimilar && (
-                        <span className="absolute bottom-2 left-2 bg-blue-500/80 text-white text-[8px] px-2 py-0.5 rounded-full">
-                          Similar
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="p-3 sm:p-4">
-                      <h3 className="font-semibold text-sm sm:text-base mb-0.5 line-clamp-1 text-white group-hover:text-blue-400 transition">
-                        {listing.title}
-                      </h3>
-
-                      <p className="text-gray-500 text-xs sm:text-sm mb-1.5 flex items-center gap-1">
-                        <svg
-                          className="w-3 h-3 sm:w-4 sm:h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                        </svg>
-                        {listing.location}
-                      </p>
-
-                      <div className="flex items-center justify-between">
-                        <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-base sm:text-xl">
-                          KSh {listing.price?.toLocaleString()}
+                          {listing.location}
                         </p>
-                        {listing.true_monthly_cost &&
-                          listing.true_monthly_cost !== listing.price && (
-                            <p className="text-[10px] text-gray-500">
-                              +
-                              {listing.service_charge
-                                ? `KSh ${listing.service_charge}`
-                                : ""}
+
+                        <div className="flex items-center justify-between">
+                          <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-base sm:text-xl">
+                            KSh {listing.price?.toLocaleString()}
+                          </p>
+                          {listing.true_monthly_cost &&
+                            listing.true_monthly_cost !== listing.price && (
+                              <p className="text-[10px] text-gray-500">
+                                +
+                                {listing.service_charge
+                                  ? `KSh ${listing.service_charge}`
+                                  : ""}
+                              </p>
+                            )}
+                        </div>
+
+                        {/* Days remaining */}
+                        {!isExpired &&
+                          !listing.is_taken &&
+                          listing.days_remaining !== undefined && (
+                            <p className={`text-[10px] mt-1 ${expiry.color}`}>
+                              {listing.days_remaining} days remaining
                             </p>
                           )}
                       </div>
-
-                      {/* Days remaining */}
-                      {!isExpired &&
-                        !listing.is_taken &&
-                        listing.days_remaining !== undefined && (
-                          <p className={`text-[10px] mt-1 ${expiry.color}`}>
-                            {listing.days_remaining} days remaining
-                          </p>
-                        )}
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                </SimpleAmbientBackground>
               );
             })}
           </div>
