@@ -9,6 +9,7 @@ import {
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import toast from "react-hot-toast";
 
 // Fix for default marker icons in Leaflet with React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -145,7 +146,7 @@ export default function MapPicker({
   // Search for location using Nominatim (OpenStreetMap)
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      toast.error("Please enter a location to search");
+      toast.error("📝 Please enter a location to search");
       return;
     }
 
@@ -157,11 +158,11 @@ export default function MapPicker({
       const data = await response.json();
       setSearchResults(data);
       if (data.length === 0) {
-        toast.warning("No locations found. Try a different search term.");
+        toast.warning("🔍 No locations found. Try a different search term.");
       }
     } catch (error) {
       console.error("Search error:", error);
-      toast.error("Failed to search location. Please try again.");
+      toast.error("❌ Failed to search location. Please try again.");
     }
     setIsSearching(false);
   };
@@ -190,7 +191,7 @@ export default function MapPicker({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search location (e.g., Kilimani, Nairobi)"
+              placeholder="🔍 Search location (e.g., Kilimani, Nairobi)"
               className="flex-1 input text-sm"
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             />
