@@ -1,5 +1,6 @@
 // src/App.jsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useState, useEffect } from "react";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import HomePage from "./pages/HomePage";
@@ -12,12 +13,54 @@ import EditListingPage from "./pages/EditListingPage";
 import ListingDetailPage from "./pages/ListingDetailPage";
 import ProfilePage from "./pages/ProfilePage";
 import FavoritesPage from "./pages/FavoritesPage";
+import LocationPermission from "./components/LocationPermission";
 import "leaflet/dist/leaflet.css";
 
 function App() {
+  const [userLocation, setUserLocation] = useState(null);
+  const [hasGrantedLocation, setHasGrantedLocation] = useState(false);
+
+  const handleLocationGranted = (location) => {
+    setUserLocation(location);
+    setHasGrantedLocation(true);
+    localStorage.setItem("userLocation", JSON.stringify(location));
+    console.log("📍 Location granted:", location);
+  };
+
+  const handleLocationDenied = () => {
+    setHasGrantedLocation(false);
+    const stored = localStorage.getItem("userLocation");
+    if (stored) {
+      try {
+        setUserLocation(JSON.parse(stored));
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
+  // Check stored location on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("userLocation");
+    if (stored) {
+      try {
+        setUserLocation(JSON.parse(stored));
+        setHasGrantedLocation(true);
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, []);
+
   return (
     <BrowserRouter>
       <Layout>
+        {/* Location Permission Prompt */}
+        <LocationPermission
+          onLocationGranted={handleLocationGranted}
+          onLocationDenied={handleLocationDenied}
+        />
+
         <Routes>
           {/* PUBLIC ROUTES */}
           <Route path="/" element={<HomePage />} />

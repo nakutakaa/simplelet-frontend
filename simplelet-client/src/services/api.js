@@ -8,12 +8,25 @@ const API = axios.create({
   },
 });
 
-// Add token to requests if it exists
+// Add token and location to requests
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Add location to headers if available
+  const location = localStorage.getItem("userLocation");
+  if (location) {
+    try {
+      const { latitude, longitude } = JSON.parse(location);
+      config.headers["X-User-Latitude"] = latitude;
+      config.headers["X-User-Longitude"] = longitude;
+    } catch (e) {
+      // ignore
+    }
+  }
+
   return config;
 });
 
