@@ -289,6 +289,12 @@ export default function LoginPage() {
                   Register here
                 </Link>
               </p>
+              <Link
+                to="/recover-password"
+                className="mt-2 inline-block text-xs text-gray-500 hover:text-blue-300 transition"
+              >
+                Forgot your password?
+              </Link>
             </div>
           </form>
         ) : (

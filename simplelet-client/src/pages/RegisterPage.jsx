@@ -6,6 +6,29 @@ import toast from "react-hot-toast";
 import API from "../services/api";
 import SafetyTip from "../components/SafetyTip";
 
+const SECURITY_QUESTIONS = [
+  {
+    key: "mother_maiden_name",
+    label: "What is your mother's maiden name?",
+  },
+  {
+    key: "first_school",
+    label: "What was the name of your first school?",
+  },
+  {
+    key: "birth_town",
+    label: "What town were you born in?",
+  },
+  {
+    key: "favorite_teacher",
+    label: "What was the name of your favorite teacher?",
+  },
+  {
+    key: "childhood_friend",
+    label: "What was the name of your childhood best friend?",
+  },
+];
+
 const getRateLimitMessage = (error) => {
   const retryAfter = Number(error.response?.headers?.["retry-after"]);
   if (Number.isFinite(retryAfter) && retryAfter > 0) {
@@ -35,6 +58,8 @@ const getErrorMessage = (error) => {
     invalid_code: "❌ Invalid verification code. Please check and try again.",
     code_expired:
       "⏳ Your verification code has expired. Please request a new one.",
+    security_question_required: "🔐 Please choose a security question.",
+    security_answer_required: "🔐 Please enter your security answer.",
     registration_failed: "❌ Registration failed. Please try again.",
     network_error: "📡 Network error. Please check your internet connection.",
     server_error: "⚠️ Server error. Please try again later.",
@@ -56,17 +81,15 @@ const getErrorMessage = (error) => {
   );
 };
 
-const sendRegistrationCode = async (phone) => {
-  const { data } = await API.post("/auth/send-registration-code", { phone });
+const sendRegistrationCode = async (payload) => {
+  const { data } = await API.post("/auth/send-registration-code", payload);
   return data;
 };
 
-const verifyAndRegister = async ({ phone, code, name, password }) => {
+const verifyAndRegister = async ({ phone, code }) => {
   const { data } = await API.post("/auth/verify-and-register", {
     phone,
     code,
-    name,
-    password,
   });
   return data;
 };
@@ -82,6 +105,8 @@ export default function RegisterPage() {
     phone: "",
     password: "",
     confirmPassword: "",
+    securityQuestionKey: "",
+    securityAnswer: "",
     code: "",
   });
 
@@ -96,10 +121,7 @@ export default function RegisterPage() {
       const errorMsg = getErrorMessage(error);
       setFieldErrors((current) => ({
         ...current,
-        phone:
-          error.response?.status === 409 || error.response?.status === 429
-            ? errorMsg
-            : errorMsg,
+        phone: errorMsg,
       }));
       toast.error(errorMsg);
 
@@ -189,9 +211,39 @@ export default function RegisterPage() {
       toast.error("🔑 Passwords do not match. Please try again.");
       return;
     }
+    if (!formData.securityQuestionKey) {
+      setFieldErrors((current) => ({
+        ...current,
+        securityQuestionKey: "🔐 Please choose a security question.",
+      }));
+      toast.error("🔐 Please choose a security question.");
+      return;
+    }
+    if (!formData.securityAnswer.trim()) {
+      setFieldErrors((current) => ({
+        ...current,
+        securityAnswer: "🔐 Please enter your security answer.",
+      }));
+      toast.error("🔐 Please enter your security answer.");
+      return;
+    }
+    if (formData.securityAnswer.trim().length < 2) {
+      setFieldErrors((current) => ({
+        ...current,
+        securityAnswer: "🔐 Security answer must be at least 2 characters.",
+      }));
+      toast.error("🔐 Security answer must be at least 2 characters.");
+      return;
+    }
 
     setFieldErrors({});
-    sendCodeMutation.mutate(formData.phone);
+    sendCodeMutation.mutate({
+      name: formData.name,
+      phone: formData.phone,
+      password: formData.password,
+      security_question_key: formData.securityQuestionKey,
+      security_answer: formData.securityAnswer,
+    });
   };
 
   const handleVerify = (e) => {
@@ -210,8 +262,6 @@ export default function RegisterPage() {
     registerMutation.mutate({
       phone: formData.phone,
       code: formData.code,
-      name: formData.name,
-      password: formData.password,
     });
   };
 
@@ -301,6 +351,53 @@ export default function RegisterPage() {
               </div>
               <p className="text-[10px] text-gray-500 mt-1">
                 Password must be at least 6 characters
+              </p>
+            </div>
+
+            <div>
+              <label className="label">Security Question</label>
+              <select
+                name="securityQuestionKey"
+                value={formData.securityQuestionKey}
+                onChange={handleChange}
+                className="input"
+                required
+              >
+                <option value="">Choose one question</option>
+                {SECURITY_QUESTIONS.map((question) => (
+                  <option key={question.key} value={question.key}>
+                    {question.label}
+                  </option>
+                ))}
+              </select>
+              {fieldErrors.securityQuestionKey && (
+                <p className="text-red-400 text-[10px] mt-1">
+                  {fieldErrors.securityQuestionKey}
+                </p>
+              )}
+              <p className="text-[10px] text-gray-500 mt-1">
+                Used later to recover your password
+              </p>
+            </div>
+
+            <div>
+              <label className="label">Security Answer</label>
+              <input
+                type="text"
+                name="securityAnswer"
+                value={formData.securityAnswer}
+                onChange={handleChange}
+                placeholder="Your answer"
+                className="input"
+                required
+              />
+              {fieldErrors.securityAnswer && (
+                <p className="text-red-400 text-[10px] mt-1">
+                  {fieldErrors.securityAnswer}
+                </p>
+              )}
+              <p className="text-[10px] text-gray-500 mt-1">
+                Keep it memorable, but not obvious
               </p>
             </div>
 

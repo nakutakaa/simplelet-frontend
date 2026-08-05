@@ -8,6 +8,7 @@ import PageErrorBoundary from "./components/PageErrorBoundary";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import RecoveryPage from "./pages/RecoveryPage";
 import VerifyPage from "./pages/VerifyPage";
 import DashboardPage from "./pages/DashboardPage";
 import CreateListingPage from "./pages/CreateListingPage";
@@ -105,6 +106,14 @@ function App() {
               element={
                 <PageErrorBoundary>
                   <VerifyPage />
+                </PageErrorBoundary>
+              }
+            />
+            <Route
+              path="/recover-password"
+              element={
+                <PageErrorBoundary>
+                  <RecoveryPage />
                 </PageErrorBoundary>
               }
             />
