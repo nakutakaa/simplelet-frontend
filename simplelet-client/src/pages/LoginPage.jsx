@@ -272,7 +272,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={sendCodeMutation.isPending}
-              className="w-full btn-primary"
+              className="w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#0a0a0a] disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {sendCodeMutation.isPending
                 ? "Sending code..."
@@ -291,7 +291,7 @@ export default function LoginPage() {
               </p>
               <Link
                 to="/recover-password"
-                className="mt-2 inline-block text-xs text-gray-500 hover:text-blue-300 transition"
+                className="mt-3 inline-flex items-center justify-center rounded-lg bg-yellow-400 px-4 py-2 text-xs font-semibold text-black shadow-md shadow-yellow-400/25 transition hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 focus:ring-offset-[#0a0a0a]"
               >
                 Forgot your password?
               </Link>
