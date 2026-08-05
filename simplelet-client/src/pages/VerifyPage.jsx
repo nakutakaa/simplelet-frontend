@@ -5,6 +5,18 @@ import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
 
+const getRateLimitMessage = (error) => {
+  const retryAfter = Number(error.response?.headers?.["retry-after"]);
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    const minutes = Math.ceil(retryAfter / 60);
+    return `⏳ Too many attempts. Please wait ${minutes} minute${
+      minutes === 1 ? "" : "s"
+    } before trying again.`;
+  }
+
+  return "⏳ Too many attempts. Please wait a few minutes before trying again.";
+};
+
 // ============ ERROR MESSAGES ============
 const getErrorMessage = (error) => {
   const status = error.response?.status;
@@ -29,7 +41,7 @@ const getErrorMessage = (error) => {
   if (status === 400)
     return "❌ Invalid verification code. Please check and try again.";
   if (status === 401) return "🔒 Session expired. Please login again.";
-  if (status === 429) return "⏳ Too many attempts. Please wait a few minutes.";
+  if (status === 429) return getRateLimitMessage(error);
   if (status === 500) return "⚠️ Server error. Please try again later.";
   if (!error.response) return "📡 Network error. Please check your connection.";
 
@@ -55,6 +67,7 @@ export default function VerifyPage() {
   const [user, setUser] = useState(null);
   const [resendCount, setResendCount] = useState(0);
   const [canResend, setCanResend] = useState(true);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -83,6 +96,7 @@ export default function VerifyPage() {
   const sendMutation = useMutation({
     mutationFn: sendVerification,
     onSuccess: () => {
+      setFieldErrors({});
       setCodeSent(true);
       setResendCount((prev) => prev + 1);
       setCanResend(false);
@@ -95,6 +109,7 @@ export default function VerifyPage() {
     },
     onError: (error) => {
       const errorMsg = getErrorMessage(error);
+      setFieldErrors((current) => ({ ...current, send: errorMsg }));
       toast.error(errorMsg);
 
       if (error.response?.status === 401) {
@@ -107,6 +122,7 @@ export default function VerifyPage() {
   const verifyMutation = useMutation({
     mutationFn: verifyCode,
     onSuccess: () => {
+      setFieldErrors({});
       toast.success("🎉 Phone verified successfully!");
       if (user) {
         const updatedUser = { ...user, is_verified: true };
@@ -116,6 +132,7 @@ export default function VerifyPage() {
     },
     onError: (error) => {
       const errorMsg = getErrorMessage(error);
+      setFieldErrors((current) => ({ ...current, code: errorMsg }));
       toast.error(errorMsg);
 
       // Handle expired code
@@ -146,14 +163,17 @@ export default function VerifyPage() {
     e.preventDefault();
 
     if (!code) {
+      setFieldErrors((current) => ({ ...current, code: "📱 Please enter the verification code." }));
       toast.error("📱 Please enter the verification code.");
       return;
     }
     if (code.length !== 6) {
+      setFieldErrors((current) => ({ ...current, code: "📱 Please enter the 6-digit code." }));
       toast.error("📱 Please enter the 6-digit code.");
       return;
     }
 
+    setFieldErrors((current) => ({ ...current, code: null }));
     verifyMutation.mutate(code);
   };
 
@@ -203,6 +223,11 @@ export default function VerifyPage() {
 
         {!codeSent ? (
           <div className="text-center">
+            {fieldErrors.send && (
+              <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300 text-left">
+                {fieldErrors.send}
+              </div>
+            )}
             <p className="text-gray-400 text-sm mb-6">
               We'll send a 6-digit verification code to your phone number.
             </p>
@@ -226,15 +251,23 @@ export default function VerifyPage() {
               <input
                 type="text"
                 value={code}
-                onChange={(e) =>
-                  setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
-                }
+                onChange={(e) => {
+                  setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                  if (fieldErrors.code) {
+                    setFieldErrors((current) => ({ ...current, code: null }));
+                  }
+                }}
                 placeholder="123456"
                 maxLength={6}
                 className="input text-center text-2xl tracking-widest font-mono"
                 required
                 autoFocus
               />
+              {fieldErrors.code && (
+                <p className="text-red-400 text-[10px] mt-1 text-center">
+                  {fieldErrors.code}
+                </p>
+              )}
               <p className="text-[10px] text-gray-500 mt-1 text-center">
                 Code expires in 10 minutes
               </p>

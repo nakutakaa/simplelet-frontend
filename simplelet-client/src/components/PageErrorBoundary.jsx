@@ -36,9 +36,7 @@ class PageErrorBoundary extends Component {
             <div className="flex gap-4">
               <ExclamationTriangleIcon className="h-6 w-6 flex-shrink-0 text-red-400 mt-1" />
               <div className="flex-1">
-                <h2 className="mb-2 font-bold text-red-400">
-                  Page Load Error
-                </h2>
+                <h2 className="mb-2 font-bold text-red-400">Page Load Error</h2>
                 <p className="mb-4 text-sm text-slate-400">
                   There was a problem loading this page. Please try again.
                 </p>

@@ -10,7 +10,8 @@ export const useErrorHandler = () => {
     try {
       return await asyncFn();
     } catch (error) {
-      const errorMessage = error.response?.data?.error ||
+      const errorMessage =
+        error.response?.data?.error ||
         error.message ||
         "An unexpected error occurred";
 

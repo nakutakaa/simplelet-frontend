@@ -70,6 +70,12 @@ export default function HomePage() {
   });
 
   useEffect(() => {
+    if (error) {
+      toast.error("Failed to load listings");
+    }
+  }, [error]);
+
+  useEffect(() => {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value) params.set(key, value);
@@ -223,7 +229,6 @@ export default function HomePage() {
   }
 
   if (error) {
-    toast.error("Failed to load listings");
     return (
       <div className="text-center py-12">
         <p className="text-red-400">

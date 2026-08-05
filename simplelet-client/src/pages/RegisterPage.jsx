@@ -6,6 +6,18 @@ import toast from "react-hot-toast";
 import API from "../services/api";
 import SafetyTip from "../components/SafetyTip";
 
+const getRateLimitMessage = (error) => {
+  const retryAfter = Number(error.response?.headers?.["retry-after"]);
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    const minutes = Math.ceil(retryAfter / 60);
+    return `⏳ Too many attempts. Please wait ${minutes} minute${
+      minutes === 1 ? "" : "s"
+    } before trying again.`;
+  }
+
+  return "⏳ Too many attempts. Please wait a few minutes before trying again.";
+};
+
 // ============ ERROR MESSAGES ============
 const getErrorMessage = (error) => {
   const status = error.response?.status;
@@ -35,6 +47,7 @@ const getErrorMessage = (error) => {
   if (status === 400) return "⚠️ Please check your information and try again.";
   if (status === 409)
     return "📱 This phone number is already registered. Please login.";
+  if (status === 429) return getRateLimitMessage(error);
   if (status === 500) return "⚠️ Server error. Please try again later.";
   if (!error.response) return "📡 Network error. Please check your connection.";
 
@@ -63,6 +76,7 @@ export default function RegisterPage() {
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -74,11 +88,19 @@ export default function RegisterPage() {
   const sendCodeMutation = useMutation({
     mutationFn: sendRegistrationCode,
     onSuccess: () => {
+      setFieldErrors({});
       toast.success("✅ Verification code sent! Check your phone.");
       setStep(2);
     },
     onError: (error) => {
       const errorMsg = getErrorMessage(error);
+      setFieldErrors((current) => ({
+        ...current,
+        phone:
+          error.response?.status === 409 || error.response?.status === 429
+            ? errorMsg
+            : errorMsg,
+      }));
       toast.error(errorMsg);
 
       // If phone exists, offer to login
@@ -99,6 +121,7 @@ export default function RegisterPage() {
   const registerMutation = useMutation({
     mutationFn: verifyAndRegister,
     onSuccess: (data) => {
+      setFieldErrors({});
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
       toast.success("🎉 Account created successfully! Welcome to SimpleLet!");
@@ -106,6 +129,10 @@ export default function RegisterPage() {
     },
     onError: (error) => {
       const errorMsg = getErrorMessage(error);
+      setFieldErrors((current) => ({
+        ...current,
+        code: errorMsg,
+      }));
       toast.error(errorMsg);
 
       if (error.response?.data?.error?.includes("expired")) {
@@ -120,49 +147,66 @@ export default function RegisterPage() {
 
     // Client-side validation
     if (!formData.name.trim()) {
+      setFieldErrors((current) => ({ ...current, name: "👤 Please enter your full name." }));
       toast.error("👤 Please enter your full name.");
       return;
     }
     if (formData.name.length < 2) {
+      setFieldErrors((current) => ({ ...current, name: "👤 Name must be at least 2 characters." }));
       toast.error("👤 Name must be at least 2 characters.");
       return;
     }
     if (!formData.phone) {
+      setFieldErrors((current) => ({ ...current, phone: "📱 Please enter your phone number." }));
       toast.error("📱 Please enter your phone number.");
       return;
     }
     if (!formData.phone.match(/^\+254[0-9]{9}$/)) {
+      setFieldErrors((current) => ({
+        ...current,
+        phone: "📱 Invalid phone format. Please use +254XXXXXXXXX (10 digits after +254)",
+      }));
       toast.error(
         "📱 Invalid phone format. Please use +254XXXXXXXXX (10 digits after +254)",
       );
       return;
     }
     if (!formData.password) {
+      setFieldErrors((current) => ({ ...current, password: "🔑 Please create a password." }));
       toast.error("🔑 Please create a password.");
       return;
     }
     if (formData.password.length < 6) {
+      setFieldErrors((current) => ({ ...current, password: "🔑 Password must be at least 6 characters." }));
       toast.error("🔑 Password must be at least 6 characters.");
       return;
     }
     if (formData.password !== formData.confirmPassword) {
+      setFieldErrors((current) => ({
+        ...current,
+        confirmPassword: "🔑 Passwords do not match. Please try again.",
+      }));
       toast.error("🔑 Passwords do not match. Please try again.");
       return;
     }
 
+    setFieldErrors({});
     sendCodeMutation.mutate(formData.phone);
   };
 
   const handleVerify = (e) => {
     e.preventDefault();
     if (!formData.code) {
+      setFieldErrors((current) => ({ ...current, code: "📱 Please enter the verification code." }));
       toast.error("📱 Please enter the verification code.");
       return;
     }
     if (formData.code.length !== 6) {
+      setFieldErrors((current) => ({ ...current, code: "📱 Please enter the 6-digit code." }));
       toast.error("📱 Please enter the 6-digit code.");
       return;
     }
+    setFieldErrors((current) => ({ ...current, code: null }));
     registerMutation.mutate({
       phone: formData.phone,
       code: formData.code,
@@ -173,6 +217,9 @@ export default function RegisterPage() {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (fieldErrors[e.target.name]) {
+      setFieldErrors((current) => ({ ...current, [e.target.name]: null }));
+    }
   };
 
   return (
@@ -200,6 +247,9 @@ export default function RegisterPage() {
                 className="input"
                 required
               />
+              {fieldErrors.name && (
+                <p className="text-red-400 text-[10px] mt-1">{fieldErrors.name}</p>
+              )}
               <p className="text-[10px] text-gray-500 mt-1">
                 This will be displayed on your listings
               </p>
@@ -216,6 +266,9 @@ export default function RegisterPage() {
                 className="input"
                 required
               />
+              {fieldErrors.phone && (
+                <p className="text-red-400 text-[10px] mt-1">{fieldErrors.phone}</p>
+              )}
               <p className="text-[10px] text-gray-500 mt-1">
                 Use format: +254XXXXXXXXX (10 digits after +254)
               </p>
@@ -233,6 +286,11 @@ export default function RegisterPage() {
                   className="input pr-10"
                   required
                 />
+                {fieldErrors.password && (
+                  <p className="text-red-400 text-[10px] mt-1">
+                    {fieldErrors.password}
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -258,6 +316,11 @@ export default function RegisterPage() {
                   className="input pr-10"
                   required
                 />
+                {fieldErrors.confirmPassword && (
+                  <p className="text-red-400 text-[10px] mt-1">
+                    {fieldErrors.confirmPassword}
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -315,6 +378,11 @@ export default function RegisterPage() {
                 required
                 autoFocus
               />
+              {fieldErrors.code && (
+                <p className="text-red-400 text-[10px] mt-1 text-center">
+                  {fieldErrors.code}
+                </p>
+              )}
               <p className="text-[10px] text-gray-500 mt-1">
                 Enter the 6-digit code sent to your phone
               </p>

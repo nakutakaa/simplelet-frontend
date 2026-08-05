@@ -5,8 +5,8 @@ const SimpleAmbientBackground = ({
   imageUrl,
   children,
   className = "",
-  intensity = 0.25,
-  blur = 80,
+  intensity = 0.04, // Ultra subtle
+  blur = 200, // Maximum blur for seamless blend
   darkMode = true,
   onColorChange = null,
 }) => {
@@ -14,10 +14,10 @@ const SimpleAmbientBackground = ({
   const [textColor, setTextColor] = useState("#ffffff");
   const [isLoaded, setIsLoaded] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [gradientColors, setGradientColors] = useState([]);
   const containerRef = useRef(null);
 
   useEffect(() => {
-    // If no image, use default dark
     if (!imageUrl) {
       setBgColor("#0a0a0a");
       setTextColor("#ffffff");
@@ -25,10 +25,9 @@ const SimpleAmbientBackground = ({
       return;
     }
 
-    // Prevent multiple extractions
     if (isExtracting) return;
 
-    const extractColor = async () => {
+    const extractColors = async () => {
       setIsExtracting(true);
 
       try {
@@ -39,71 +38,60 @@ const SimpleAmbientBackground = ({
         await new Promise((resolve, reject) => {
           img.onload = resolve;
           img.onerror = reject;
-          // Timeout fallback
           setTimeout(reject, 10000);
         });
 
-        // Create canvas to extract color
         const canvas = document.createElement("canvas");
-        const size = 20;
+        const size = 30;
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext("2d");
 
-        // Draw image scaled down (faster processing)
         ctx.drawImage(img, 0, 0, size, size);
 
-        // Get pixel data
         const imageData = ctx.getImageData(0, 0, size, size);
         const data = imageData.data;
 
-        // Calculate average color (ignoring transparent pixels)
-        let r = 0,
-          g = 0,
-          b = 0,
-          count = 0;
-
+        const colors = [];
         for (let i = 0; i < data.length; i += 4) {
-          // Only count non-transparent pixels
           if (data[i + 3] > 128) {
-            r += data[i];
-            g += data[i + 1];
-            b += data[i + 2];
-            count++;
+            colors.push({
+              r: data[i],
+              g: data[i + 1],
+              b: data[i + 2],
+            });
           }
         }
 
-        if (count > 0) {
-          r = Math.round(r / count);
-          g = Math.round(g / count);
-          b = Math.round(b / count);
+        if (colors.length > 0) {
+          const dominant = findDominantColor(colors);
+          const accent = findAccentColor(colors, dominant);
 
-          // Darken the color slightly for better readability
-          const darkenFactor = 0.7;
-          r = Math.round(r * darkenFactor);
-          g = Math.round(g * darkenFactor);
-          b = Math.round(b * darkenFactor);
+          // Heavy darkening to blend with black theme
+          const darkenFactor = 0.25;
+          const mainColor = darkenColor(dominant, darkenFactor);
+          const accentColor = darkenColor(
+            accent || dominant,
+            darkenFactor + 0.05,
+          );
 
-          const hex = `#${[r, g, b]
-            .map((c) => Math.max(0, Math.min(255, c)))
-            .map((c) => c.toString(16).padStart(2, "0"))
-            .join("")}`;
+          const mainHex = rgbToHex(mainColor);
+          const accentHex = rgbToHex(accentColor);
 
-          setBgColor(hex);
+          setBgColor(mainHex);
+          setGradientColors([mainHex, accentHex]);
 
-          // Determine text color based on background brightness
-          const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+          const brightness =
+            (dominant.r * 299 + dominant.g * 587 + dominant.b * 114) / 1000;
           const textColor = brightness > 150 ? "#0a0a0a" : "#ffffff";
           setTextColor(textColor);
 
           setIsLoaded(true);
 
-          // Callback if provided
           if (onColorChange) {
-            onColorChange({ color: hex, brightness, textColor });
+            onColorChange({ color: mainHex, brightness, textColor });
           }
         } else {
-          // Fallback if no pixels found
           setBgColor("#0a0a0a");
           setTextColor("#ffffff");
           setIsLoaded(false);
@@ -118,48 +106,145 @@ const SimpleAmbientBackground = ({
       }
     };
 
-    extractColor();
+    extractColors();
 
-    // Cleanup
     return () => {
       setIsExtracting(false);
     };
   }, [imageUrl, onColorChange]);
 
+  const findDominantColor = (colors) => {
+    let r = 0,
+      g = 0,
+      b = 0;
+    colors.forEach((c) => {
+      r += c.r;
+      g += c.g;
+      b += c.b;
+    });
+    return {
+      r: Math.round(r / colors.length),
+      g: Math.round(g / colors.length),
+      b: Math.round(b / colors.length),
+    };
+  };
+
+  const findAccentColor = (colors, dominant) => {
+    let maxDiff = 0;
+    let accent = null;
+
+    colors.forEach((c) => {
+      const diff =
+        Math.abs(c.r - dominant.r) +
+        Math.abs(c.g - dominant.g) +
+        Math.abs(c.b - dominant.b);
+      if (diff > maxDiff) {
+        maxDiff = diff;
+        accent = c;
+      }
+    });
+
+    return accent;
+  };
+
+  const darkenColor = (color, factor) => {
+    return {
+      r: Math.round(color.r * factor),
+      g: Math.round(color.g * factor),
+      b: Math.round(color.b * factor),
+    };
+  };
+
+  const rgbToHex = (color) => {
+    return `#${[color.r, color.g, color.b]
+      .map((c) => Math.max(0, Math.min(255, c)))
+      .map((c) => c.toString(16).padStart(2, "0"))
+      .join("")}`;
+  };
+
+  const getGradientStyle = () => {
+    if (gradientColors.length >= 2) {
+      return {
+        background: `linear-gradient(180deg, ${gradientColors[0]} 0%, ${gradientColors[1]} 100%)`,
+        color: textColor,
+      };
+    }
+    return {
+      backgroundColor: bgColor,
+      color: textColor,
+    };
+  };
+
   return (
     <div
       ref={containerRef}
-      className={`relative transition-colors duration-700 ${className}`}
-      style={{
-        backgroundColor: isLoaded ? bgColor : "#0a0a0a",
-        color: textColor,
-      }}
+      className={`relative transition-all duration-1000 ease-in-out ${className}`}
+      style={getGradientStyle()}
     >
-      {/* Ambient glow effect */}
+      {/* ============ ULTRA SUBTLE AMBIENT GLOW (BLENDS WITH BLACK) ============ */}
       {isLoaded && (
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `radial-gradient(ellipse at 50% 0%, ${bgColor}66 0%, transparent 70%)`,
-            opacity: intensity,
-            filter: `blur(${blur}px)`,
-          }}
-        />
-      )}
+        <>
+          {/* Main glow - very faint whisper of color */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: `radial-gradient(ellipse at 50% 20%, ${bgColor}40 0%, transparent 80%)`,
+              opacity: intensity * 1.2,
+              filter: `blur(${blur}px)`,
+            }}
+          />
 
-      {/* Subtle gradient overlay */}
-      {isLoaded && (
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `linear-gradient(180deg, ${bgColor}33 0%, transparent 50%, ${bgColor}22 100%)`,
-            opacity: 0.3,
-          }}
-        />
+          {/* Secondary accent glow - barely there */}
+          {gradientColors.length >= 2 && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: `radial-gradient(ellipse at 60% 80%, ${gradientColors[1]}20 0%, transparent 70%)`,
+                opacity: intensity * 0.6,
+                filter: `blur(${blur * 1.3}px)`,
+              }}
+            />
+          )}
+
+          {/* Very gentle warm hint */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: `radial-gradient(ellipse at 30% 50%, ${bgColor}15 0%, transparent 60%)`,
+              opacity: intensity * 0.3,
+              filter: `blur(${blur * 0.9}px)`,
+            }}
+          />
+
+          {/* Subtle pulse - almost invisible */}
+          <div
+            className="absolute inset-0 pointer-events-none animate-pulse-slow"
+            style={{
+              background: `radial-gradient(ellipse at 70% 40%, ${bgColor}10 0%, transparent 50%)`,
+              opacity: intensity * 0.15,
+              filter: `blur(${blur * 0.7}px)`,
+            }}
+          />
+        </>
       )}
 
       {/* Content */}
       <div className="relative z-10">{children}</div>
+
+      <style jsx>{`
+        @keyframes pulse-slow {
+          0%,
+          100% {
+            opacity: 0.3;
+          }
+          50% {
+            opacity: 0.6;
+          }
+        }
+        .animate-pulse-slow {
+          animation: pulse-slow 8s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 };

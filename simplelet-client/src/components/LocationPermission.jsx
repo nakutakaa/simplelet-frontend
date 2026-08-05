@@ -75,7 +75,7 @@ const LocationPermission = ({ onLocationGranted, onLocationDenied }) => {
 
   const skipLocation = () => {
     setPermissionState("denied");
-    toast.info("📍 You can enable location later from your browser settings.");
+    toast("📍 You can enable location later from your browser settings.");
     if (onLocationDenied) onLocationDenied();
   };
 
