@@ -6,6 +6,7 @@ import API from "../services/api";
 import toast from "react-hot-toast";
 import SafetyTip from "../components/SafetyTip";
 import SimpleAmbientBackground from "../components/SimpleAmbientBackground";
+import { useRealTimeListings } from "../hooks";
 
 // House types for filter dropdown
 const HOUSE_TYPES = [
@@ -64,10 +65,27 @@ export default function HomePage() {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [showNearby, setShowNearby] = useState(false);
 
+  const currentUser = JSON.parse(localStorage.getItem("user") || "null");
+  const userId = currentUser?.id || currentUser?.user_id || null;
+  const { newListings } = useRealTimeListings(null, userId, filters);
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["listings", filters],
     queryFn: () => fetchListings(filters),
   });
+
+  const allListings = [
+    ...(newListings || []),
+    ...((Array.isArray(data) ? data : data?.data || data?.listings || []) || []),
+  ];
+
+  const uniqueListingsMap = new Map();
+  allListings.forEach((listing) => {
+    if (!uniqueListingsMap.has(listing.id)) {
+      uniqueListingsMap.set(listing.id, listing);
+    }
+  });
+  const uniqueListings = Array.from(uniqueListingsMap.values());
 
   useEffect(() => {
     if (error) {
@@ -241,11 +259,27 @@ export default function HomePage() {
     );
   }
 
-  const listings = data?.listings || [];
+  const listings = uniqueListings;
   const hasLocation = userLocation || filters.nearby;
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* New Listings Notification */}
+      {newListings.length > 0 && (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between">
+          <span className="text-sm text-emerald-300 flex items-center gap-2">
+            <span className="animate-pulse">🔔</span>
+            {newListings.length} new listing{newListings.length > 1 ? "s" : ""} matching your search!
+          </span>
+          <button
+            onClick={() => refetch()}
+            className="text-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 px-3 py-1 rounded-lg transition"
+          >
+            View New
+          </button>
+        </div>
+      )}
+
       {/* Search and Filter Bar */}
       <div className="bg-black rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
         <SafetyTip page="search" className="mb-4" />

@@ -12,6 +12,7 @@ import CredibilityBadge from "../components/CredibilityBadge";
 import SafetyTip from "../components/SafetyTip";
 import SimpleAmbientBackground from "../components/SimpleAmbientBackground";
 import FullScreenMap from "../components/FullScreenMap";
+import { useRealTimeComments } from "../hooks";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -145,6 +146,9 @@ export default function ListingDetailPage() {
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "null");
   const isLoggedIn = !!token && user;
+  const userId = user?.id || user?.user_id || null;
+  const { comments: liveComments, viewers: liveCommentViewers } =
+    useRealTimeComments(id, userId);
 
   // Check favorite status
   useEffect(() => {
@@ -199,6 +203,12 @@ export default function ListingDetailPage() {
     queryFn: () => fetchComments(id),
     enabled: !!id,
   });
+
+  useEffect(() => {
+    if (liveComments.length > 0) {
+      refetchComments();
+    }
+  }, [liveComments.length, refetchComments]);
 
   // Fetch reviews
   const {
@@ -1013,6 +1023,14 @@ export default function ListingDetailPage() {
                   </span>
                 )}
               </h3>
+              {liveCommentViewers.length > 0 && (
+                <div className="mb-4">
+                  <span className="text-[11px] rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2 py-1 text-cyan-300">
+                    ⚡ {liveCommentViewers.length} live viewer
+                    {liveCommentViewers.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+              )}
 
               {/* Comment Input */}
               {isLoggedIn ? (

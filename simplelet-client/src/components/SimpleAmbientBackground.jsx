@@ -231,7 +231,7 @@ const SimpleAmbientBackground = ({
       {/* Content */}
       <div className="relative z-10">{children}</div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes pulse-slow {
           0%,
           100% {

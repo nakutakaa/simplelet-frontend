@@ -1,5 +1,5 @@
 // src/components/CommentItem.jsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import API from "../services/api";
@@ -44,6 +44,25 @@ export default function CommentItem({
   const [repliesPage, setRepliesPage] = useState(1);
   const [allReplies, setAllReplies] = useState(comment.replies || []);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const latestReplies = comment.replies || [];
+    setAllReplies((prevReplies) => {
+      if (!prevReplies.length) return latestReplies;
+      if (!latestReplies.length) return prevReplies;
+
+      const seenIds = new Set(latestReplies.map((reply) => String(reply.id)));
+      const mergedReplies = [...latestReplies];
+
+      for (const reply of prevReplies) {
+        if (!seenIds.has(String(reply.id))) {
+          mergedReplies.push(reply);
+        }
+      }
+
+      return mergedReplies;
+    });
+  }, [comment.replies]);
 
   // Query for fetching more replies
   const { data: moreRepliesData, refetch: refetchMoreReplies } = useQuery({

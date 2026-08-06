@@ -1,6 +1,7 @@
 // src/components/Layout.jsx
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import SocketStatusDot from "./SocketStatusDot";
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
@@ -30,6 +31,8 @@ export default function Layout({ children }) {
             </Link>
 
             <div className="flex gap-3 items-center">
+              {/* Live socket status — shows for logged-in users */}
+              <SocketStatusDot />
               {token ? (
                 <>
                   <Link

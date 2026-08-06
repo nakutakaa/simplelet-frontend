@@ -18,6 +18,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false, // Allow self-signed certificates
       },
+      "/socket.io": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
     },
   },
 });
