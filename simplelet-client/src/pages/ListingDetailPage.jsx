@@ -12,7 +12,7 @@ import CredibilityBadge from "../components/CredibilityBadge";
 import SafetyTip from "../components/SafetyTip";
 import SimpleAmbientBackground from "../components/SimpleAmbientBackground";
 import FullScreenMap from "../components/FullScreenMap";
-import { useRealTimeComments } from "../hooks";
+import { useRealTimeComments, useRealTimeReviews } from "../hooks";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -149,6 +149,8 @@ export default function ListingDetailPage() {
   const userId = user?.id || user?.user_id || null;
   const { comments: liveComments, viewers: liveCommentViewers } =
     useRealTimeComments(id, userId);
+  const { viewers: liveReviewViewers, eventsCount: liveReviewEventsCount } =
+    useRealTimeReviews(id, userId);
 
   // Check favorite status
   useEffect(() => {
@@ -220,6 +222,13 @@ export default function ListingDetailPage() {
     queryFn: () => fetchReviews(id),
     enabled: !!id,
   });
+
+  useEffect(() => {
+    if (liveReviewEventsCount > 0) {
+      refetchReviews();
+      refetchListing();
+    }
+  }, [liveReviewEventsCount, refetchReviews, refetchListing]);
 
   // Post comment mutation
   const commentMutation = useMutation({
@@ -1002,6 +1011,14 @@ export default function ListingDetailPage() {
 
             {/* ============ Review Section ============ */}
             <div className="mt-6 border-t border-white/10 pt-6">
+              {liveReviewViewers.length > 0 && (
+                <div className="mb-3">
+                  <span className="text-[11px] rounded-full border border-yellow-400/20 bg-yellow-500/10 px-2 py-1 text-yellow-300">
+                    ⭐ {liveReviewViewers.length} live review viewer
+                    {liveReviewViewers.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+              )}
               <ReviewSection
                 listingId={listing.id}
                 listingTitle={listing.title}
