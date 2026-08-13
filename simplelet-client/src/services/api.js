@@ -1,8 +1,11 @@
 // src/services/api.js
 import axios from "axios";
 
+// Use environment variable for API URL
+const API_URL = import.meta.env.VITE_API_URL || "/api";
+
 const API = axios.create({
-  baseURL: "/api", // Proxied to http://localhost:5000/api
+  baseURL: API_URL,
   headers: {
     "Content-Type": "application/json",
   },
