@@ -84,7 +84,9 @@ export default function SocketStatusDot() {
             className={`relative inline-flex rounded-full h-2 w-2 ${config.dot}`}
           />
         </span>
-        <span className={`text-[11px] font-medium hidden sm:inline ${config.text}`}>
+        <span
+          className={`text-[11px] font-medium hidden sm:inline ${config.text}`}
+        >
           {config.label}
         </span>
       </button>

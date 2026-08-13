@@ -2,11 +2,11 @@
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import SocketStatusDot from "./SocketStatusDot";
+import PwaInstallPrompt from "./PwaInstallPrompt";
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
-  const user = JSON.parse(localStorage.getItem("user") || "null");
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -33,6 +33,7 @@ export default function Layout({ children }) {
             <div className="flex gap-3 items-center">
               {/* Live socket status — shows for logged-in users */}
               <SocketStatusDot />
+              <PwaInstallPrompt compact />
               {token ? (
                 <>
                   <Link
