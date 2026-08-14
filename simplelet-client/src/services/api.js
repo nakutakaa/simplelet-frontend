@@ -1,8 +1,22 @@
 // src/services/api.js
 import axios from "axios";
 
-// Use environment variable for API URL
-const API_URL = import.meta.env.VITE_API_URL || "/api";
+// ============ FIX: Ensure API_URL includes /api ============
+let API_URL = import.meta.env.VITE_API_URL || "/api";
+
+// If API_URL is a full URL without /api, add it
+if (API_URL && API_URL.startsWith("http")) {
+  // Remove trailing slash if exists
+  if (API_URL.endsWith("/")) {
+    API_URL = API_URL.slice(0, -1);
+  }
+  // Add /api if not present
+  if (!API_URL.includes("/api") && !API_URL.endsWith("/api")) {
+    API_URL = `${API_URL}/api`;
+  }
+}
+
+console.log("🔍 API URL:", API_URL);
 
 const API = axios.create({
   baseURL: API_URL,
