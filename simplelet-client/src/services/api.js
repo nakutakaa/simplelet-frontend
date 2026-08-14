@@ -1,36 +1,48 @@
-
 // src/services/api.js
 import axios from "axios";
 
-// ============ API URL Configuration ============
-// Use environment variable or hardcode for testing
-const API_URL = import.meta.env.VITE_API_URL || "https://simplelet-server-production.up.railway.app/api";
+// ============ SMART API URL CONFIG ============
+// This ensures /api is always included, no matter what
+const getApiUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  
+  // If environment variable is set, use it but ensure it ends with /api
+  if (envUrl) {
+    let url = envUrl.replace(/\/+$/, ''); // Remove trailing slash
+    if (!url.endsWith('/api')) {
+      url = `${url}/api`;
+    }
+    return url;
+  }
+  
+  // Default for local development (proxy)
+  return '/api';
+};
 
-console.log("🔍 API URL:", API_URL);
+const API_URL = getApiUrl();
+console.log('🔍 API URL:', API_URL);
 
 const API = axios.create({
   baseURL: API_URL,
   headers: {
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
   },
 });
 
-// ============ Request Interceptor ============
+// Add token and location to requests
 API.interceptors.request.use(
   (config) => {
-    // Add JWT token if available
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Add location if available
-    const location = localStorage.getItem("userLocation");
+    const location = localStorage.getItem('userLocation');
     if (location) {
       try {
         const { latitude, longitude } = JSON.parse(location);
-        config.headers["X-User-Latitude"] = latitude;
-        config.headers["X-User-Longitude"] = longitude;
+        config.headers['X-User-Latitude'] = latitude;
+        config.headers['X-User-Longitude'] = longitude;
       } catch (e) {
         // ignore
       }
@@ -41,15 +53,14 @@ API.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ============ Response Interceptor ============
+// Handle response errors globally
 API.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/login";
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
