@@ -7,6 +7,7 @@ import API from "../services/api";
 import { XMarkIcon, PhotoIcon, CameraIcon } from "@heroicons/react/24/outline";
 import MapPicker from "../components/MapPicker";
 import SafetyTip from "../components/SafetyTip";
+import { uploadToCloudinary } from "../services/cloudinary";
 
 // House types from backend
 const HOUSE_TYPES = [
@@ -90,12 +91,10 @@ const getErrorMessage = (error, context = "listing") => {
     timeout: "⏳ Request timed out. Please try again.",
   };
 
-  // Check for specific error codes first
   if (errorCode && errorMap[errorCode]) {
     return errorMap[errorCode];
   }
 
-  // Check by HTTP status
   if (status === 400) return "⚠️ Please check your information and try again.";
   if (status === 401) return "🔒 Session expired. Please login again.";
   if (status === 403)
@@ -117,15 +116,10 @@ const createListing = async (listingData) => {
   return data;
 };
 
-// Upload images mutation
-const uploadImages = async ({ listingId, images }) => {
-  const formData = new FormData();
-  images.forEach((image) => {
-    formData.append("images", image);
-  });
-  const { data } = await API.post(`/listings/${listingId}/images`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+// NEW: Upload image URLs to backend (not the files themselves)
+const saveImageUrls = async ({ listingId, images }) => {
+  const payload = { images };
+  const { data } = await API.post(`/listings/${listingId}/images`, payload);
   return data;
 };
 
@@ -182,6 +176,7 @@ export default function CreateListingPage() {
   const [locationStatus, setLocationStatus] = useState(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
 
   // ============ AUTO-SEARCH LOCATION ON MAP ============
   useEffect(() => {
@@ -244,7 +239,8 @@ export default function CreateListingPage() {
     onSuccess: (data) => {
       setListingId(data.id);
       if (images.length > 0) {
-        uploadMutation.mutate({ listingId: data.id, images });
+        // Upload images directly to Cloudinary, then send URLs to backend
+        handleImageUpload(data.id);
       } else {
         toast.success("🏠 Listing created successfully!");
         queryClient.invalidateQueries(["myListings"]);
@@ -261,55 +257,68 @@ export default function CreateListingPage() {
     },
   });
 
-  // ============ UPLOAD IMAGES ============
-  const uploadMutation = useMutation({
-    mutationFn: uploadImages,
-    onSuccess: (data) => {
-      const rejectedCount = data.rejected_files?.length || 0;
-      const uploadedCount = data.uploaded?.length || 0;
+  // ============ UPLOAD IMAGES TO CLOUDINARY & SAVE URLs ============
+  const handleImageUpload = async (listingId) => {
+    setIsUploadingImages(true);
+    const loadingToastId = toast.loading("Uploading images...");
 
-      // All images rejected - rollback
-      if (rejectedCount > 0 && uploadedCount === 0) {
-        toast.error("❌ All images were rejected. Rolling back listing...");
-
-        // Show rejection reasons
-        data.rejected_files.forEach((rejected) => {
-          toast.error(`❌ ${rejected.filename}: ${rejected.reason}`);
-        });
-
-        setIsRollingBack(true);
-        deleteMutation.mutate(listingId);
-        return;
+    try {
+      // Upload each image to Cloudinary
+      const uploadedImages = [];
+      for (const file of images) {
+        try {
+          const result = await uploadToCloudinary(file);
+          uploadedImages.push(result);
+        } catch (error) {
+          console.error("Cloudinary upload error:", error);
+          toast.error(`❌ Failed to upload ${file.name}: ${error.message}`);
+          setIsUploadingImages(false);
+          toast.dismiss(loadingToastId);
+          // Rollback listing
+          deleteMutation.mutate(listingId);
+          return;
+        }
       }
 
-      // Some images rejected, some uploaded
-      if (rejectedCount > 0 && uploadedCount > 0) {
-        toast.warning(
-          `⚠️ ${rejectedCount} image(s) rejected. ${uploadedCount} uploaded.`,
-        );
-        data.rejected_files.forEach((rejected) => {
-          toast.error(`❌ ${rejected.filename}: ${rejected.reason}`);
-        });
+      // Send the URLs to backend
+      const payload = {
+        listingId,
+        images: uploadedImages,
+      };
+
+      const response = await API.post(`/listings/${listingId}/images`, payload);
+      const data = response.data;
+
+      // Check for any issues from backend
+      if (data.errors && data.errors.length > 0) {
+        data.errors.forEach((err) => toast.error(`❌ ${err}`));
       }
 
-      // Show location status
-      if (data.location_warnings?.length > 0) {
-        data.location_warnings.forEach((warning) => {
-          toast.warning(`⚠️ ${warning.warning}`);
-        });
-      }
-      if (data.location_verified) {
-        toast.success("📍 Location verified!");
-      }
-
-      toast.success(`✅ Listing created with ${uploadedCount} images!`);
+      toast.success(`✅ Listing created with ${uploadedImages.length} images!`, {
+        id: loadingToastId,
+      });
       queryClient.invalidateQueries(["myListings"]);
       navigate("/dashboard");
+    } catch (error) {
+      console.error("Image upload error:", error);
+      toast.error("❌ Failed to save images. Rolling back listing...", {
+        id: loadingToastId,
+      });
+      deleteMutation.mutate(listingId);
+    } finally {
+      setIsUploadingImages(false);
+    }
+  };
+
+  // ============ SAVE IMAGE URLS MUTATION (backend call) ============
+  const saveImageMutation = useMutation({
+    mutationFn: saveImageUrls,
+    onSuccess: (data) => {
+      toast.success("✅ Images saved successfully!");
     },
     onError: (error) => {
       const errorMsg = getErrorMessage(error, "upload");
       toast.error(`❌ ${errorMsg}. Rolling back listing...`);
-      setIsRollingBack(true);
       deleteMutation.mutate(listingId);
     },
   });
@@ -322,7 +331,6 @@ export default function CreateListingPage() {
       [name]: type === "checkbox" ? checked : value,
     }));
 
-    // Clear validation error for this field
     if (validationErrors[name]) {
       setValidationErrors((prev) => ({ ...prev, [name]: null }));
     }
@@ -377,7 +385,6 @@ export default function CreateListingPage() {
     e.preventDefault();
 
     if (!validateForm()) {
-      // Show first error
       const firstError = Object.values(validationErrors)[0];
       if (firstError) {
         toast.error(firstError);
@@ -397,7 +404,6 @@ export default function CreateListingPage() {
       }
     }
 
-    // Ensure numeric fields are properly parsed
     const numericFields = [
       "price",
       "service_charge",
@@ -524,7 +530,7 @@ export default function CreateListingPage() {
   };
 
   const isSubmitting =
-    createMutation.isPending || uploadMutation.isPending || isRollingBack;
+    createMutation.isPending || isUploadingImages || isRollingBack;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -1123,6 +1129,8 @@ export default function CreateListingPage() {
               {isSubmitting
                 ? isRollingBack
                   ? "Rolling back..."
+                  : isUploadingImages
+                  ? "Uploading images..."
                   : "Creating..."
                 : `Post Listing (${images.length} photos)`}
             </button>
