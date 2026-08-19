@@ -7,6 +7,7 @@ import API from "../services/api";
 import { XMarkIcon, CameraIcon } from "@heroicons/react/24/outline";
 import MapPicker from "../components/MapPicker";
 import SafetyTip from "../components/SafetyTip";
+import { uploadToCloudinary } from "../services/cloudinary";
 
 // House types
 const HOUSE_TYPES = [
@@ -118,14 +119,11 @@ const deleteImage = async (imageId) => {
   return data;
 };
 
-// Upload new images
+// Upload new images (now accepts JSON payload with Cloudinary URLs)
 const uploadImages = async ({ listingId, images }) => {
-  const formData = new FormData();
-  images.forEach((image) => {
-    formData.append("images", image);
-  });
-  const { data } = await API.post(`/listings/${listingId}/images`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+  // images is now an array of objects: { url, thumbnail, public_id }
+  const { data } = await API.post(`/listings/${listingId}/images`, {
+    images: images,
   });
   return data;
 };
@@ -292,17 +290,36 @@ export default function EditListingPage() {
         }
       }
 
-      // Handle new image uploads
+      // Handle new image uploads (direct to Cloudinary then backend)
       if (newImages.length > 0) {
         setIsUploadingImages(true);
         try {
+          // Upload each new image directly to Cloudinary
+          const uploadedImages = [];
+          for (const file of newImages) {
+            try {
+              const result = await uploadToCloudinary(file);
+              uploadedImages.push(result);
+            } catch (uploadError) {
+              toast.error(`❌ Failed to upload ${file.name}: ${uploadError.message}`);
+              // Continue with other images
+            }
+          }
+
+          if (uploadedImages.length === 0) {
+            toast.error("❌ No images were uploaded successfully.");
+            setIsUploadingImages(false);
+            return;
+          }
+
+          // Send URLs to backend
           const result = await uploadImages({
             listingId: id,
-            images: newImages,
+            images: uploadedImages,
           });
 
           const rejectedCount = result.rejected_files?.length || 0;
-          const uploadedCount = result.uploaded?.length || 0;
+          const uploadedCount = uploadedImages.length;
 
           if (rejectedCount > 0 && uploadedCount === 0) {
             toast.error(
@@ -528,6 +545,7 @@ export default function EditListingPage() {
       });
     }
 
+    // Add file to newImages state (will be uploaded on submit)
     setNewImages([...newImages, file]);
     const preview = {
       url: URL.createObjectURL(file),
@@ -1142,6 +1160,7 @@ export default function EditListingPage() {
               </button>
             </div>
 
+            {/* New Image Previews */}
             {newImagePreviews.length > 0 && (
               <div className="mt-4">
                 <div className="grid grid-cols-4 gap-3">
