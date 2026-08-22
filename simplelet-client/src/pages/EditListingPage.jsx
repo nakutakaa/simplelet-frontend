@@ -7,7 +7,7 @@ import API from "../services/api";
 import { XMarkIcon, CameraIcon } from "@heroicons/react/24/outline";
 import MapPicker from "../components/MapPicker";
 import SafetyTip from "../components/SafetyTip";
-import { uploadToCloudinary } from "../services/cloudinary";
+import { uploadToCloudinary } from "../services/cloudinary.js";
 
 // House types
 const HOUSE_TYPES = [
@@ -301,7 +301,9 @@ export default function EditListingPage() {
               const result = await uploadToCloudinary(file);
               uploadedImages.push(result);
             } catch (uploadError) {
-              toast.error(`❌ Failed to upload ${file.name}: ${uploadError.message}`);
+              toast.error(
+                `❌ Failed to upload ${file.name}: ${uploadError.message}`,
+              );
               // Continue with other images
             }
           }

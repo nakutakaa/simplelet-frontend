@@ -7,7 +7,7 @@ import API from "../services/api";
 import { XMarkIcon, PhotoIcon, CameraIcon } from "@heroicons/react/24/outline";
 import MapPicker from "../components/MapPicker";
 import SafetyTip from "../components/SafetyTip";
-import { uploadToCloudinary } from "../services/cloudinary";
+import { uploadToCloudinary } from "../services/cloudinary.js";
 
 // House types from backend
 const HOUSE_TYPES = [
@@ -294,9 +294,12 @@ export default function CreateListingPage() {
         data.errors.forEach((err) => toast.error(`❌ ${err}`));
       }
 
-      toast.success(`✅ Listing created with ${uploadedImages.length} images!`, {
-        id: loadingToastId,
-      });
+      toast.success(
+        `✅ Listing created with ${uploadedImages.length} images!`,
+        {
+          id: loadingToastId,
+        },
+      );
       queryClient.invalidateQueries(["myListings"]);
       navigate("/dashboard");
     } catch (error) {
@@ -1130,8 +1133,8 @@ export default function CreateListingPage() {
                 ? isRollingBack
                   ? "Rolling back..."
                   : isUploadingImages
-                  ? "Uploading images..."
-                  : "Creating..."
+                    ? "Uploading images..."
+                    : "Creating..."
                 : `Post Listing (${images.length} photos)`}
             </button>
           </div>
