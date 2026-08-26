@@ -8,6 +8,7 @@ import { XMarkIcon, CameraIcon } from "@heroicons/react/24/outline";
 import MapPicker from "../components/MapPicker";
 import SafetyTip from "../components/SafetyTip";
 import { uploadToCloudinary } from "../services/cloudinary.js";
+import { compressImage } from "../services/imageCompressor.js";
 
 // House types
 const HOUSE_TYPES = [
@@ -121,7 +122,6 @@ const deleteImage = async (imageId) => {
 
 // Upload new images (now accepts JSON payload with Cloudinary URLs)
 const uploadImages = async ({ listingId, images }) => {
-  // images is now an array of objects: { url, thumbnail, public_id }
   const { data } = await API.post(`/listings/${listingId}/images`, {
     images: images,
   });
@@ -294,7 +294,7 @@ export default function EditListingPage() {
       if (newImages.length > 0) {
         setIsUploadingImages(true);
         try {
-          // Upload each new image directly to Cloudinary
+          // Upload each compressed image directly to Cloudinary
           const uploadedImages = [];
           for (const file of newImages) {
             try {
@@ -304,7 +304,6 @@ export default function EditListingPage() {
               toast.error(
                 `❌ Failed to upload ${file.name}: ${uploadError.message}`,
               );
-              // Continue with other images
             }
           }
 
@@ -482,81 +481,88 @@ export default function EditListingPage() {
     setExistingImages(existingImages.filter((img) => img.id !== image.id));
   };
 
-  // ============ CAMERA CAPTURE ============
+  // ============ CAMERA CAPTURE WITH EXIF PRESERVING COMPRESSION ============
   const handleCameraCapture = async (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const file = e.target.files[0];
-    if (!file) {
+    const rawFile = e.target.files[0];
+    if (!rawFile) {
       console.log("No file selected");
       e.target.value = "";
       return;
     }
 
-    console.log("📸 File captured:", file.name, file.type, file.size);
+    console.log("📸 Raw file captured:", rawFile.name, rawFile.type, rawFile.size);
 
-    if (!file.type.startsWith("image/")) {
+    if (!rawFile.type.startsWith("image/")) {
       toast.error("📸 Please select an image file.");
       e.target.value = "";
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("📸 Image exceeds 10MB limit.");
+    if (rawFile.size > 15 * 1024 * 1024) {
+      toast.error("📸 Image exceeds 15MB limit.");
       e.target.value = "";
       return;
     }
 
-    const loadingToastId = toast.loading("Processing photo...");
-
-    let deviceLat = null;
-    let deviceLon = null;
+    const loadingToastId = toast.loading("Compressing & preserving EXIF data...");
 
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 30000,
+      // 1. Compress raw image while preserving EXIF metadata
+      const compressedFile = await compressImage(rawFile);
+      console.log("📸 Optimized file size:", compressedFile.size, "bytes");
+
+      // 2. Fetch browser geolocation fallback
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 30000,
+          });
         });
-      });
 
-      deviceLat = position.coords.latitude;
-      deviceLon = position.coords.longitude;
+        const deviceLat = position.coords.latitude;
+        const deviceLon = position.coords.longitude;
 
-      console.log("📍 GPS detected:", deviceLat, deviceLon);
-      setFormData((prev) => ({
-        ...prev,
-        latitude: deviceLat.toString(),
-        longitude: deviceLon.toString(),
-      }));
-      setLocationStatus({
-        success: true,
-        message: `📍 Location detected: ${deviceLat.toFixed(6)}, ${deviceLon.toFixed(6)}`,
-      });
-      toast.success("📍 Location detected!", { id: loadingToastId });
+        console.log("📍 GPS detected:", deviceLat, deviceLon);
+        setFormData((prev) => ({
+          ...prev,
+          latitude: deviceLat.toString(),
+          longitude: deviceLon.toString(),
+        }));
+        setLocationStatus({
+          success: true,
+          message: `📍 Location detected: ${deviceLat.toFixed(6)}, ${deviceLon.toFixed(6)}`,
+        });
+      } catch (error) {
+        console.warn("⚠️ GPS error:", error.message);
+        setLocationStatus({
+          success: false,
+          message: "⚠️ Could not get GPS location. Using pin if available.",
+        });
+      }
+
+      // 3. Save compressed file to state (will be uploaded to Cloudinary on submit)
+      setNewImages((prev) => [...prev, compressedFile]);
+      const preview = {
+        url: URL.createObjectURL(compressedFile),
+        name: rawFile.name || "Camera photo",
+        isCamera: true,
+      };
+      setNewImagePreviews((prev) => [...prev, preview]);
+
+      toast.success(
+        `📸 Photo processed! (${(compressedFile.size / 1024).toFixed(0)}KB)`,
+        { id: loadingToastId }
+      );
     } catch (error) {
-      console.warn("⚠️ GPS error:", error.message);
-      setLocationStatus({
-        success: false,
-        message: "⚠️ Could not get GPS location. Using pin if available.",
-      });
-      toast.warning("⚠️ GPS not available. Using pin if set.", {
-        id: loadingToastId,
-      });
+      console.error("Compression error:", error);
+      toast.error("❌ Failed to process image.", { id: loadingToastId });
     }
 
-    // Add file to newImages state (will be uploaded on submit)
-    setNewImages([...newImages, file]);
-    const preview = {
-      url: URL.createObjectURL(file),
-      name: file.name || "Camera photo",
-      isCamera: true,
-    };
-    setNewImagePreviews([...newImagePreviews, preview]);
-
-    toast.success("📸 Photo captured!", { id: loadingToastId });
     e.target.value = "";
   };
 
@@ -1160,6 +1166,9 @@ export default function EditListingPage() {
                 <CameraIcon className="w-5 h-5" />
                 Open Camera
               </button>
+              <p className="text-[10px] text-gray-500 mt-3">
+                Photos will be compressed locally while preserving GPS EXIF data
+              </p>
             </div>
 
             {/* New Image Previews */}

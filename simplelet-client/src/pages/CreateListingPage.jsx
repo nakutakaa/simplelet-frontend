@@ -8,6 +8,7 @@ import { XMarkIcon, PhotoIcon, CameraIcon } from "@heroicons/react/24/outline";
 import MapPicker from "../components/MapPicker";
 import SafetyTip from "../components/SafetyTip";
 import { uploadToCloudinary } from "../services/cloudinary.js";
+import { compressImage } from "../services/imageCompressor.js";
 
 // House types from backend
 const HOUSE_TYPES = [
@@ -66,7 +67,6 @@ const getErrorMessage = (error, context = "listing") => {
   const errorCode = data?.error_code || data?.error || "";
 
   const errorMap = {
-    // Listing creation errors
     house_type_required: "🏠 Please select a property type.",
     location_required: "📍 Please enter the property location.",
     invalid_house_type: "🏠 Invalid property type selected.",
@@ -74,8 +74,6 @@ const getErrorMessage = (error, context = "listing") => {
     price_negative: "💰 Price cannot be negative.",
     invalid_phone: "📱 Invalid phone number format.",
     listing_creation_failed: "❌ Failed to create listing. Please try again.",
-
-    // Image upload errors
     no_images: "📸 Please take at least one photo of the property.",
     too_many_images: "📸 Maximum 10 images allowed.",
     image_upload_failed: "❌ Failed to upload images. Please try again.",
@@ -84,8 +82,6 @@ const getErrorMessage = (error, context = "listing") => {
     location_mismatch: "📍 Photo location does not match the pin location.",
     camera_only:
       "📸 Please use your camera to take photos (no gallery uploads).",
-
-    // Network errors
     network_error: "📡 Network error. Please check your connection.",
     server_error: "⚠️ Server error. Please try again later.",
     timeout: "⏳ Request timed out. Please try again.",
@@ -113,13 +109,6 @@ const getErrorMessage = (error, context = "listing") => {
 // Create listing mutation
 const createListing = async (listingData) => {
   const { data } = await API.post("/listings", listingData);
-  return data;
-};
-
-// NEW: Upload image URLs to backend (not the files themselves)
-const saveImageUrls = async ({ listingId, images }) => {
-  const payload = { images };
-  const { data } = await API.post(`/listings/${listingId}/images`, payload);
   return data;
 };
 
@@ -239,7 +228,6 @@ export default function CreateListingPage() {
     onSuccess: (data) => {
       setListingId(data.id);
       if (images.length > 0) {
-        // Upload images directly to Cloudinary, then send URLs to backend
         handleImageUpload(data.id);
       } else {
         toast.success("🏠 Listing created successfully!");
@@ -257,13 +245,12 @@ export default function CreateListingPage() {
     },
   });
 
-  // ============ UPLOAD IMAGES TO CLOUDINARY & SAVE URLs ============
+  // ============ UPLOAD IMAGES ============
   const handleImageUpload = async (listingId) => {
     setIsUploadingImages(true);
     const loadingToastId = toast.loading("Uploading images...");
 
     try {
-      // Upload each image to Cloudinary
       const uploadedImages = [];
       for (const file of images) {
         try {
@@ -274,13 +261,11 @@ export default function CreateListingPage() {
           toast.error(`❌ Failed to upload ${file.name}: ${error.message}`);
           setIsUploadingImages(false);
           toast.dismiss(loadingToastId);
-          // Rollback listing
           deleteMutation.mutate(listingId);
           return;
         }
       }
 
-      // Send the URLs to backend
       const payload = {
         listingId,
         images: uploadedImages,
@@ -289,16 +274,13 @@ export default function CreateListingPage() {
       const response = await API.post(`/listings/${listingId}/images`, payload);
       const data = response.data;
 
-      // Check for any issues from backend
       if (data.errors && data.errors.length > 0) {
         data.errors.forEach((err) => toast.error(`❌ ${err}`));
       }
 
       toast.success(
         `✅ Listing created with ${uploadedImages.length} images!`,
-        {
-          id: loadingToastId,
-        },
+        { id: loadingToastId },
       );
       queryClient.invalidateQueries(["myListings"]);
       navigate("/dashboard");
@@ -312,19 +294,6 @@ export default function CreateListingPage() {
       setIsUploadingImages(false);
     }
   };
-
-  // ============ SAVE IMAGE URLS MUTATION (backend call) ============
-  const saveImageMutation = useMutation({
-    mutationFn: saveImageUrls,
-    onSuccess: (data) => {
-      toast.success("✅ Images saved successfully!");
-    },
-    onError: (error) => {
-      const errorMsg = getErrorMessage(error, "upload");
-      toast.error(`❌ ${errorMsg}. Rolling back listing...`);
-      deleteMutation.mutate(listingId);
-    },
-  });
 
   // Handle form input changes
   const handleChange = (e) => {
@@ -395,7 +364,6 @@ export default function CreateListingPage() {
       return;
     }
 
-    // Clean up form data
     const cleanedData = {};
     for (const [key, value] of Object.entries(formData)) {
       if (value === "" || value === null || value === undefined) {
@@ -431,82 +399,89 @@ export default function CreateListingPage() {
     createMutation.mutate(cleanedData);
   };
 
-  // ============ CAMERA CAPTURE ============
+  // ============ CAMERA CAPTURE WITH EXIF PRESERVING COMPRESSION ============
   const handleCameraCapture = async (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const file = e.target.files[0];
-    if (!file) {
+    const rawFile = e.target.files[0];
+    if (!rawFile) {
       console.log("No file selected");
       e.target.value = "";
       return;
     }
 
-    console.log("📸 File captured:", file.name, file.type, file.size);
+    console.log("📸 Raw file captured:", rawFile.name, rawFile.type, rawFile.size);
 
-    if (!file.type.startsWith("image/")) {
+    if (!rawFile.type.startsWith("image/")) {
       toast.error("📸 Please select an image file.");
       e.target.value = "";
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("📸 Image exceeds 10MB limit.");
+    if (rawFile.size > 15 * 1024 * 1024) {
+      toast.error("📸 Image exceeds 15MB limit.");
       e.target.value = "";
       return;
     }
 
-    const loadingToastId = toast.loading("Processing photo...");
-
-    let deviceLat = null;
-    let deviceLon = null;
+    const loadingToastId = toast.loading("Compressing & preserving EXIF data...");
 
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 30000,
+      // 1. Compress raw image while retaining EXIF headers
+      const compressedFile = await compressImage(rawFile);
+      console.log("📸 Optimized file size:", compressedFile.size, "bytes");
+
+      // 2. Fetch browser geolocation fallback
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 30000,
+          });
         });
-      });
 
-      deviceLat = position.coords.latitude;
-      deviceLon = position.coords.longitude;
+        const deviceLat = position.coords.latitude;
+        const deviceLon = position.coords.longitude;
 
-      console.log("📍 GPS detected:", deviceLat, deviceLon);
-      setFormData((prev) => ({
-        ...prev,
-        latitude: deviceLat.toString(),
-        longitude: deviceLon.toString(),
-      }));
-      setLocationStatus({
-        success: true,
-        message: `📍 Location detected: ${deviceLat.toFixed(6)}, ${deviceLon.toFixed(6)}`,
-      });
-      toast.success("📍 Location detected!", { id: loadingToastId });
+        console.log("📍 GPS detected:", deviceLat, deviceLon);
+        setFormData((prev) => ({
+          ...prev,
+          latitude: deviceLat.toString(),
+          longitude: deviceLon.toString(),
+        }));
+        setLocationStatus({
+          success: true,
+          message: `📍 Location detected: ${deviceLat.toFixed(6)}, ${deviceLon.toFixed(6)}`,
+        });
+      } catch (error) {
+        console.warn("⚠️ GPS error:", error.message);
+        setLocationStatus({
+          success: false,
+          message: "⚠️ Could not get GPS location. Using pin location if available.",
+        });
+      }
+
+      // 3. Save compressed file to state
+      setImages((prev) => [...prev, compressedFile]);
+      const preview = {
+        url: URL.createObjectURL(compressedFile),
+        name: rawFile.name || "Camera photo",
+        isCamera: true,
+      };
+      setImagePreviews((prev) => [...prev, preview]);
+      setValidationErrors((prev) => ({ ...prev, images: null }));
+
+      toast.success(
+        `📸 Photo processed! (${(compressedFile.size / 1024).toFixed(0)}KB)`,
+        { id: loadingToastId }
+      );
     } catch (error) {
-      console.warn("⚠️ GPS error:", error.message);
-      setLocationStatus({
-        success: false,
-        message:
-          "⚠️ Could not get GPS location. Using pin location if available.",
-      });
-      toast.warning("⚠️ GPS not available. Using pin if set.", {
-        id: loadingToastId,
-      });
+      console.error("Compression error:", error);
+      toast.error("❌ Failed to process image.", { id: loadingToastId });
     }
 
-    setImages((prev) => [...prev, file]);
-    const preview = {
-      url: URL.createObjectURL(file),
-      name: file.name || "Camera photo",
-      isCamera: true,
-    };
-    setImagePreviews((prev) => [...prev, preview]);
-    setValidationErrors((prev) => ({ ...prev, images: null }));
-
-    toast.success("📸 Photo captured!", { id: loadingToastId });
     e.target.value = "";
   };
 
@@ -1058,8 +1033,7 @@ export default function CreateListingPage() {
                 Open Camera
               </button>
               <p className="text-[10px] text-gray-500 mt-3">
-                Photos will be watermarked with your details and location
-                verified
+                Photos will be compressed locally and watermarked with your details
               </p>
               {validationErrors.images && (
                 <p className="text-red-400 text-[10px] mt-2">
