@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
+import { GoogleLogin } from "@react-oauth/google";
 import toast from "react-hot-toast";
 import API from "../services/api";
 import SafetyTip from "../components/SafetyTip";
@@ -75,6 +76,11 @@ const verifyAndLogin = async ({ phone, code }) => {
   return data;
 };
 
+const verifyGoogleToken = async (token) => {
+  const { data } = await API.post("/auth/google", { token });
+  return data;
+};
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -95,6 +101,22 @@ export default function LoginPage() {
   const clearAllFieldErrors = () => {
     setFieldErrors({});
   };
+
+  // Google OAuth Mutation
+  const googleAuthMutation = useMutation({
+    mutationFn: verifyGoogleToken,
+    onSuccess: (data) => {
+      clearAllFieldErrors();
+      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      toast.success("🎉 Welcome back to SimpleLet!");
+      navigate("/");
+    },
+    onError: (error) => {
+      const errorMsg = getErrorMessage(error, "google");
+      toast.error(errorMsg);
+    },
+  });
 
   const sendCodeMutation = useMutation({
     mutationFn: sendLoginCode,
@@ -211,6 +233,43 @@ export default function LoginPage() {
         </p>
 
         <SafetyTip page="login" className="mb-6" />
+
+        {step === 1 && (
+          <div className="mb-6">
+            <div className="flex justify-center w-full">
+              {googleAuthMutation.isPending ? (
+                <div className="py-2 text-sm text-gray-400 animate-pulse">
+                  Authenticating with Google...
+                </div>
+              ) : (
+                <GoogleLogin
+                  onSuccess={(credentialResponse) => {
+                    if (credentialResponse.credential) {
+                      googleAuthMutation.mutate(credentialResponse.credential);
+                    }
+                  }}
+                  onError={() => {
+                    toast.error("Google Sign-In failed or popup was closed.");
+                  }}
+                  theme="filled_black"
+                  shape="pill"
+                  width="100%"
+                />
+              )}
+            </div>
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/10"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-[#0a0a0a] px-3 text-gray-500 font-medium">
+                  Or login with phone
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {step === 1 ? (
           <form onSubmit={handleSendCode} className="space-y-4">
