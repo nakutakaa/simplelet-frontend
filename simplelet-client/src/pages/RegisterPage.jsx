@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
+import { GoogleLogin } from "@react-oauth/google";
 import toast from "react-hot-toast";
 import API from "../services/api";
 import SafetyTip from "../components/SafetyTip";
@@ -94,6 +95,11 @@ const verifyAndRegister = async ({ phone, code }) => {
   return data;
 };
 
+const verifyGoogleToken = async (token) => {
+  const { data } = await API.post("/auth/google", { token });
+  return data;
+};
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -108,6 +114,21 @@ export default function RegisterPage() {
     securityQuestionKey: "",
     securityAnswer: "",
     code: "",
+  });
+
+  // Google OAuth Mutation
+  const googleAuthMutation = useMutation({
+    mutationFn: verifyGoogleToken,
+    onSuccess: (data) => {
+      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      toast.success("🎉 Welcome to SimpleLet!");
+      navigate("/");
+    },
+    onError: (error) => {
+      const errorMsg = getErrorMessage(error);
+      toast.error(errorMsg);
+    },
   });
 
   const sendCodeMutation = useMutation({
@@ -125,7 +146,6 @@ export default function RegisterPage() {
       }));
       toast.error(errorMsg);
 
-      // If phone exists, offer to login
       if (error.response?.status === 409) {
         setTimeout(() => {
           if (
@@ -167,7 +187,6 @@ export default function RegisterPage() {
   const handleSendCode = (e) => {
     e.preventDefault();
 
-    // Client-side validation
     if (!formData.name.trim()) {
       setFieldErrors((current) => ({ ...current, name: "👤 Please enter your full name." }));
       toast.error("👤 Please enter your full name.");
@@ -227,14 +246,6 @@ export default function RegisterPage() {
       toast.error("🔐 Please enter your security answer.");
       return;
     }
-    if (formData.securityAnswer.trim().length < 2) {
-      setFieldErrors((current) => ({
-        ...current,
-        securityAnswer: "🔐 Security answer must be at least 2 characters.",
-      }));
-      toast.error("🔐 Security answer must be at least 2 characters.");
-      return;
-    }
 
     setFieldErrors({});
     sendCodeMutation.mutate({
@@ -284,6 +295,43 @@ export default function RegisterPage() {
 
         <SafetyTip page="register" className="mb-6" />
 
+        {step === 1 && (
+          <div className="mb-6">
+            <div className="flex justify-center w-full">
+              {googleAuthMutation.isPending ? (
+                <div className="py-2 text-sm text-gray-400 animate-pulse">
+                  Authenticating with Google...
+                </div>
+              ) : (
+                <GoogleLogin
+                  onSuccess={(credentialResponse) => {
+                    if (credentialResponse.credential) {
+                      googleAuthMutation.mutate(credentialResponse.credential);
+                    }
+                  }}
+                  onError={() => {
+                    toast.error("Google Sign-In failed or popup was closed.");
+                  }}
+                  theme="filled_black"
+                  shape="pill"
+                  width="100%"
+                />
+              )}
+            </div>
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/10"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-[#0a0a0a] px-3 text-gray-500 font-medium">
+                  Or register with phone
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {step === 1 ? (
           <form onSubmit={handleSendCode} className="space-y-4">
             <div>
@@ -300,9 +348,6 @@ export default function RegisterPage() {
               {fieldErrors.name && (
                 <p className="text-red-400 text-[10px] mt-1">{fieldErrors.name}</p>
               )}
-              <p className="text-[10px] text-gray-500 mt-1">
-                This will be displayed on your listings
-              </p>
             </div>
 
             <div>
@@ -319,9 +364,6 @@ export default function RegisterPage() {
               {fieldErrors.phone && (
                 <p className="text-red-400 text-[10px] mt-1">{fieldErrors.phone}</p>
               )}
-              <p className="text-[10px] text-gray-500 mt-1">
-                Use format: +254XXXXXXXXX (10 digits after +254)
-              </p>
             </div>
 
             <div>
@@ -336,11 +378,6 @@ export default function RegisterPage() {
                   className="input pr-10"
                   required
                 />
-                {fieldErrors.password && (
-                  <p className="text-red-400 text-[10px] mt-1">
-                    {fieldErrors.password}
-                  </p>
-                )}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -349,9 +386,6 @@ export default function RegisterPage() {
                   {showPassword ? "🙈" : "👁️"}
                 </button>
               </div>
-              <p className="text-[10px] text-gray-500 mt-1">
-                Password must be at least 6 characters
-              </p>
             </div>
 
             <div>
@@ -370,14 +404,6 @@ export default function RegisterPage() {
                   </option>
                 ))}
               </select>
-              {fieldErrors.securityQuestionKey && (
-                <p className="text-red-400 text-[10px] mt-1">
-                  {fieldErrors.securityQuestionKey}
-                </p>
-              )}
-              <p className="text-[10px] text-gray-500 mt-1">
-                Used later to recover your password
-              </p>
             </div>
 
             <div>
@@ -391,14 +417,6 @@ export default function RegisterPage() {
                 className="input"
                 required
               />
-              {fieldErrors.securityAnswer && (
-                <p className="text-red-400 text-[10px] mt-1">
-                  {fieldErrors.securityAnswer}
-                </p>
-              )}
-              <p className="text-[10px] text-gray-500 mt-1">
-                Keep it memorable, but not obvious
-              </p>
             </div>
 
             <div>
@@ -413,11 +431,6 @@ export default function RegisterPage() {
                   className="input pr-10"
                   required
                 />
-                {fieldErrors.confirmPassword && (
-                  <p className="text-red-400 text-[10px] mt-1">
-                    {fieldErrors.confirmPassword}
-                  </p>
-                )}
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -457,9 +470,6 @@ export default function RegisterPage() {
                 We sent a code to{" "}
                 <span className="text-white">{formData.phone}</span>
               </p>
-              <p className="text-[10px] text-gray-500 mt-1">
-                Code expires in 10 minutes
-              </p>
             </div>
 
             <div>
@@ -475,14 +485,6 @@ export default function RegisterPage() {
                 required
                 autoFocus
               />
-              {fieldErrors.code && (
-                <p className="text-red-400 text-[10px] mt-1 text-center">
-                  {fieldErrors.code}
-                </p>
-              )}
-              <p className="text-[10px] text-gray-500 mt-1">
-                Enter the 6-digit code sent to your phone
-              </p>
             </div>
 
             <button
@@ -501,17 +503,6 @@ export default function RegisterPage() {
               className="w-full text-sm text-gray-400 hover:text-white transition"
             >
               ← Back to edit information
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setStep(1);
-                toast.info("🔄 Request a new code with your details.");
-              }}
-              className="w-full text-xs text-gray-500 hover:text-gray-400 transition"
-            >
-              🔄 Resend verification code
             </button>
           </form>
         )}
