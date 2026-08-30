@@ -6,6 +6,7 @@ import { GoogleLogin } from "@react-oauth/google";
 import toast from "react-hot-toast";
 import API from "../services/api";
 import SafetyTip from "../components/SafetyTip";
+import PhonePromptModal from "../components/PhonePromptModal";
 
 const getErrorMessage = (error) => {
   const status = error.response?.status;
@@ -34,14 +35,20 @@ export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
 
   const googleAuthMutation = useMutation({
     mutationFn: verifyGoogleToken,
     onSuccess: (data) => {
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
-      toast.success("🎉 Welcome back to SimpleLet!");
-      navigate("/");
+
+      if (!data.user.phone) {
+        setShowPhoneModal(true);
+      } else {
+        toast.success("🎉 Welcome back to SimpleLet!");
+        navigate("/");
+      }
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -53,8 +60,13 @@ export default function LoginPage() {
     onSuccess: (data) => {
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
-      toast.success("🎉 Login successful!");
-      navigate("/");
+
+      if (!data.user.phone) {
+        setShowPhoneModal(true);
+      } else {
+        toast.success("🎉 Login successful!");
+        navigate("/");
+      }
     },
     onError: (error) => {
       const errorMsg = getErrorMessage(error);
@@ -178,6 +190,15 @@ export default function LoginPage() {
           </div>
         </form>
       </div>
+
+      <PhonePromptModal
+        isOpen={showPhoneModal}
+        onClose={() => setShowPhoneModal(false)}
+        onSuccess={() => {
+          toast.success("🎉 Welcome back to SimpleLet!");
+          navigate("/");
+        }}
+      />
     </div>
   );
 }
