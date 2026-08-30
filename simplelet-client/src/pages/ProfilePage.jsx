@@ -68,7 +68,7 @@ const getErrorMessage = (error, context = "profile") => {
 };
 
 const fetchProfile = async () => {
-  const { data } = await API.get("/auth/me");
+  const { data } = await API.get("/user/profile"); // Updated from /auth/me
   return data;
 };
 
