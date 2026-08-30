@@ -20,6 +20,7 @@ import { ArrowsPointingOutIcon } from "@heroicons/react/24/outline";
 
 // Fix for default marker icons in Leaflet with React
 delete L.Icon.Default.prototype._getIconUrl;
+const defaultIcon = new L.Icon.Default();
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
@@ -32,7 +33,7 @@ L.Icon.Default.mergeOptions({
 // Custom green marker for verified location
 const verifiedPinIcon = new L.Icon({
   iconUrl:
-    "https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
+    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
   shadowUrl:
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
   iconSize: [25, 41],
@@ -296,27 +297,29 @@ export default function ListingDetailPage() {
     toast.success("⭐ Review submitted! Thank you for your feedback.");
   };
 
-  // Determine if we have location data to show on map
-  const hasLocation =
-    (listing?.latitude && listing?.longitude) ||
-    (listing?.pin_latitude && listing?.pin_longitude);
-
-  // Get best location for map
+  // Safe location extraction and validation
   const getMapLocation = () => {
-    if (listing?.pin_latitude && listing?.pin_longitude) {
-      return {
-        lat: listing.pin_latitude,
-        lng: listing.pin_longitude,
-        source: "pin",
-      };
+    let lat, lng, source;
+
+    if (listing?.pin_latitude != null && listing?.pin_longitude != null) {
+      lat = parseFloat(listing.pin_latitude);
+      lng = parseFloat(listing.pin_longitude);
+      source = "pin";
+    } else if (listing?.latitude != null && listing?.longitude != null) {
+      lat = parseFloat(listing.latitude);
+      lng = parseFloat(listing.longitude);
+      source = "gps";
     }
-    if (listing?.latitude && listing?.longitude) {
-      return { lat: listing.latitude, lng: listing.longitude, source: "gps" };
+
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+      return null;
     }
-    return null;
+
+    return { lat, lng, source };
   };
 
   const mapLocation = getMapLocation();
+  const hasLocation = mapLocation !== null;
 
   if (isLoading) {
     return (
@@ -362,7 +365,7 @@ export default function ListingDetailPage() {
   const expiryStatus = listing.expiry_status || "active";
   const expiryStatusText = listing.expiry_status_text || "Active";
   const daysRemaining = listing.days_remaining;
-  const isLocationVerified = listing.location_verified || listing.pin_verified;
+  const isLocationVerified = Boolean(listing.location_verified || listing.pin_verified);
 
   // Helper to render feature check
   const renderFeature = (label, value) => {
@@ -821,7 +824,7 @@ export default function ListingDetailPage() {
             )}
 
             {/* ============ MAP DISPLAY ============ */}
-            {hasLocation && mapLocation && (
+            {hasLocation && (
               <div className="border-t border-white/10 pt-4 mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold text-gray-300">
@@ -857,12 +860,12 @@ export default function ListingDetailPage() {
                     attributionControl={true}
                   >
                     <TileLayer
-                      attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
                     <Marker
                       position={[mapLocation.lat, mapLocation.lng]}
-                      icon={isLocationVerified ? verifiedPinIcon : undefined}
+                      icon={isLocationVerified ? verifiedPinIcon : defaultIcon}
                     >
                       <Popup>
                         <div className="text-sm">
@@ -1116,19 +1119,21 @@ export default function ListingDetailPage() {
         </div>
       </SimpleAmbientBackground>
 
-      {/* Full Screen Map Modal */}
-      <FullScreenMap
-        isOpen={isMapFullScreen}
-        onClose={() => setIsMapFullScreen(false)}
-        location={mapLocation}
-        title={listing.title}
-        isVerified={isLocationVerified}
-        nearbyAmenities={{
-          matatu_distance: listing.matatu_distance,
-          supermarket_distance: listing.supermarket_distance,
-          gym_distance: listing.gym_distance,
-        }}
-      />
+      {/* Full Screen Map Modal (Safe Render) */}
+      {hasLocation && (
+        <FullScreenMap
+          isOpen={isMapFullScreen}
+          onClose={() => setIsMapFullScreen(false)}
+          location={mapLocation}
+          title={listing.title}
+          isVerified={isLocationVerified}
+          nearbyAmenities={{
+            matatu_distance: listing.matatu_distance,
+            supermarket_distance: listing.supermarket_distance,
+            gym_distance: listing.gym_distance,
+          }}
+        />
+      )}
     </>
   );
 }
