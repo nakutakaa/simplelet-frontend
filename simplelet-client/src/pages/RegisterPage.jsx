@@ -6,6 +6,7 @@ import { GoogleLogin } from "@react-oauth/google";
 import toast from "react-hot-toast";
 import API from "../services/api";
 import SafetyTip from "../components/SafetyTip";
+import PhonePromptModal from "../components/PhonePromptModal";
 
 const SECURITY_QUESTIONS = [
   { key: "mother_maiden_name", label: "What is your mother's maiden name?" },
@@ -18,7 +19,6 @@ const SECURITY_QUESTIONS = [
 const getErrorMessage = (error) => {
   const status = error.response?.status;
   const data = error.response?.data;
-  const errorCode = data?.error_code || data?.error || "";
 
   if (status === 409) return "📱 This phone number is already registered. Please login.";
   if (status === 400) return data?.error || "⚠️ Please check your information and try again.";
@@ -42,6 +42,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -56,8 +57,13 @@ export default function RegisterPage() {
     onSuccess: (data) => {
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
-      toast.success("🎉 Welcome to SimpleLet!");
-      navigate("/");
+
+      if (!data.user.phone) {
+        setShowPhoneModal(true);
+      } else {
+        toast.success("🎉 Welcome to SimpleLet!");
+        navigate("/");
+      }
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -278,6 +284,15 @@ export default function RegisterPage() {
           </div>
         </form>
       </div>
+
+      <PhonePromptModal
+        isOpen={showPhoneModal}
+        onClose={() => setShowPhoneModal(false)}
+        onSuccess={() => {
+          toast.success("🎉 Welcome to SimpleLet!");
+          navigate("/");
+        }}
+      />
     </div>
   );
 }
