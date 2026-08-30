@@ -20,70 +20,72 @@ export default function Layout({ children }) {
     <div className="min-h-screen bg-black flex flex-col">
       {/* Header */}
       <header
-        className="sticky top-0 z-50 border-b border-white/10 bg-cover bg-center bg-no-repeat relative shadow-xl"
-        style={{ backgroundImage: `url(${slateBg})` }}
+        className="sticky top-0 z-50 border-b border-white/15 bg-cover bg-center bg-no-repeat shadow-2xl relative"
+        style={{
+          backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.65)), url(${slateBg})`,
+        }}
       >
-        {/* Dark Overlay & Blur */}
-        <div className="bg-black/85 backdrop-blur-md w-full h-full">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-              <Link to="/" className="hover:opacity-80 transition group">
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-white to-red-400 bg-clip-text text-transparent">
-                  SimpleLet
-                </h1>
-                <p className="text-xs text-gray-400 group-hover:text-gray-300 transition">
-                  Simple property listings. No clutter.
-                </p>
-              </Link>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <Link to="/" className="hover:opacity-80 transition group">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-white to-red-400 bg-clip-text text-transparent drop-shadow-md">
+                SimpleLet
+              </h1>
+              <p className="text-xs text-gray-300 group-hover:text-white transition drop-shadow">
+                Simple property listings. No clutter.
+              </p>
+            </Link>
 
-              <div className="flex gap-3 items-center">
-                {/* Live socket status — shows for logged-in users */}
-                <SocketStatusDot />
-                <PwaInstallPrompt compact />
-                {token ? (
-                  <>
-                    <Link
-                      to="/favorites"
-                      className="text-gray-300 hover:text-white transition text-sm"
-                    >
-                      Favorites
-                    </Link>
-                    <Link
-                      to="/dashboard"
-                      className="text-gray-300 hover:text-white transition text-sm"
-                    >
-                      Dashboard
-                    </Link>
-                    <Link
-                      to="/profile"
-                      className="text-gray-300 hover:text-white transition text-sm"
-                    >
-                      Profile
-                    </Link>
-                    <Link
-                      to="/create-listing"
-                      className="btn-primary text-sm hidden sm:inline-block"
-                    >
-                      + Post Ad
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      className="btn-outline text-sm"
-                    >
-                      Logout
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Link to="/login" className="btn-outline text-sm">
-                      Login
-                    </Link>
-                    <Link to="/register" className="btn-primary text-sm">
-                      Register
-                    </Link>
-                  </>
-                )}
-              </div>
+            <div className="flex gap-3 items-center">
+              {/* Live socket status — shows for logged-in users */}
+              <SocketStatusDot />
+              <PwaInstallPrompt compact />
+              {token ? (
+                <>
+                  <Link
+                    to="/favorites"
+                    className="text-gray-200 hover:text-white font-medium transition text-sm drop-shadow"
+                  >
+                    Favorites
+                  </Link>
+                  <Link
+                    to="/dashboard"
+                    className="text-gray-200 hover:text-white font-medium transition text-sm drop-shadow"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    to="/profile"
+                    className="text-gray-200 hover:text-white font-medium transition text-sm drop-shadow"
+                  >
+                    Profile
+                  </Link>
+                  <Link
+                    to="/create-listing"
+                    className="btn-primary text-sm hidden sm:inline-block shadow-lg"
+                  >
+                    + Post Ad
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="btn-outline text-sm shadow-md"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link to="/login" className="btn-outline text-sm shadow-md">
+                    Login
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="btn-primary text-sm shadow-lg"
+                  >
+                    Register
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -96,27 +98,26 @@ export default function Layout({ children }) {
 
       {/* Footer */}
       <footer
-        className="border-t border-white/10 mt-auto bg-cover bg-center bg-no-repeat relative"
-        style={{ backgroundImage: `url(${slateBg})` }}
+        className="border-t border-white/15 mt-auto bg-cover bg-center bg-no-repeat relative shadow-2xl"
+        style={{
+          backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7)), url(${slateBg})`,
+        }}
       >
-        {/* Dark Overlay */}
-        <div className="bg-black/85 backdrop-blur-md w-full h-full">
-          <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-              <p className="text-gray-400 text-sm">
-                © 2026 SimpleLet. Made with ❤️
-              </p>
-              <div className="flex gap-6 text-sm text-gray-400">
-                <span className="hover:text-white transition cursor-pointer">
-                  About
-                </span>
-                <span className="hover:text-white transition cursor-pointer">
-                  Privacy
-                </span>
-                <span className="hover:text-white transition cursor-pointer">
-                  Terms
-                </span>
-              </div>
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-gray-300 text-sm font-medium drop-shadow">
+              © 2026 SimpleLet. Made with ❤️
+            </p>
+            <div className="flex gap-6 text-sm text-gray-300 font-medium">
+              <span className="hover:text-white transition cursor-pointer drop-shadow">
+                About
+              </span>
+              <span className="hover:text-white transition cursor-pointer drop-shadow">
+                Privacy
+              </span>
+              <span className="hover:text-white transition cursor-pointer drop-shadow">
+                Terms
+              </span>
             </div>
           </div>
         </div>
