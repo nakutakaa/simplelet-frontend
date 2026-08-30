@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import SafetyTip from "../components/SafetyTip";
 import SimpleAmbientBackground from "../components/SimpleAmbientBackground";
 import { useRealTimeListings } from "../hooks";
+import slateBg from "../assets/images/slate-bg.jpg";
 
 // House types for filter dropdown
 const HOUSE_TYPES = [
@@ -76,7 +77,8 @@ export default function HomePage() {
 
   const allListings = [
     ...(newListings || []),
-    ...((Array.isArray(data) ? data : data?.data || data?.listings || []) || []),
+    ...((Array.isArray(data) ? data : data?.data || data?.listings || []) ||
+      []),
   ];
 
   const uniqueListingsMap = new Map();
@@ -230,14 +232,6 @@ export default function HomePage() {
     return icons[badge.level] || "⚪";
   };
 
-  // Check if a listing is similar type to the filter
-  const isSimilarType = (listingType, filterType) => {
-    if (!filterType) return true;
-    if (listingType === filterType) return true;
-    const similar = getSimilarTypes(filterType);
-    return similar.includes(listingType);
-  };
-
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -263,13 +257,19 @@ export default function HomePage() {
   const hasLocation = userLocation || filters.nearby;
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div
+      className="space-y-4 sm:space-y-6 -mx-4 sm:-mx-6 lg:-mx-8 -my-8 p-4 sm:p-6 lg:p-8 bg-cover bg-center bg-no-repeat min-h-screen"
+      style={{
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.75)), url(${slateBg})`,
+      }}
+    >
       {/* New Listings Notification */}
       {newListings.length > 0 && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between">
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between backdrop-blur-sm">
           <span className="text-sm text-emerald-300 flex items-center gap-2">
             <span className="animate-pulse">🔔</span>
-            {newListings.length} new listing{newListings.length > 1 ? "s" : ""} matching your search!
+            {newListings.length} new listing{newListings.length > 1 ? "s" : ""}{" "}
+            matching your search!
           </span>
           <button
             onClick={() => refetch()}
@@ -281,7 +281,7 @@ export default function HomePage() {
       )}
 
       {/* Search and Filter Bar */}
-      <div className="bg-black rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
+      <div className="bg-black/90 backdrop-blur-md rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
         <SafetyTip page="search" className="mb-4" />
 
         <form onSubmit={handleSearchSubmit} className="space-y-3 sm:space-y-4">
@@ -468,7 +468,7 @@ export default function HomePage() {
 
       {/* Listings Grid */}
       {listings.length === 0 ? (
-        <div className="text-center py-12 sm:py-16 bg-black rounded-2xl border border-white/10">
+        <div className="text-center py-12 sm:py-16 bg-black/90 backdrop-blur-md rounded-2xl border border-white/10">
           <svg
             className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-3 sm:mb-4"
             fill="none"
@@ -513,7 +513,7 @@ export default function HomePage() {
         <>
           {/* ============ SMART SEARCH RESULT INFO ============ */}
           {filters.house_type && (
-            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 bg-black/30 p-2 rounded-xl border border-white/5">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 bg-black/80 backdrop-blur-sm p-2 rounded-xl border border-white/5">
               <span>🔍 Showing:</span>
               <span className="text-white font-medium">
                 {HOUSE_TYPES.find((t) => t.value === filters.house_type)?.label}
@@ -556,7 +556,7 @@ export default function HomePage() {
                   imageUrl={listing.cover_image}
                   intensity={0.2}
                   blur={40}
-                  className="rounded-xl overflow-hidden transition-colors duration-700"
+                  className="rounded-xl overflow-hidden transition-colors duration-700 shadow-xl"
                 >
                   <Link to={`/listing/${listing.id}`}>
                     <div
