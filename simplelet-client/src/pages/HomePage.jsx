@@ -32,7 +32,6 @@ const SORT_OPTIONS = [
 ];
 
 // Property type similarity mapping
-// This helps find similar properties when exact type isn't available
 const PROPERTY_TYPE_SIMILARITY = {
   studio: ["bedsitter", "single_room"],
   bedsitter: ["studio", "single_room"],
@@ -180,6 +179,7 @@ export default function HomePage() {
         {similarTypes.map((type) => (
           <button
             key={type}
+            type="button"
             onClick={() => {
               setFilters((prev) => ({ ...prev, house_type: type }));
             }}
@@ -258,9 +258,10 @@ export default function HomePage() {
 
   return (
     <div
-      className="space-y-4 sm:space-y-6 -mx-4 sm:-mx-6 lg:-mx-8 -my-8 p-4 sm:p-6 lg:p-8 bg-cover bg-center bg-no-repeat min-h-screen"
+      className="min-h-screen bg-cover bg-center bg-no-repeat bg-fixed space-y-4 sm:space-y-6 -mx-4 sm:-mx-6 lg:-mx-8 p-4 sm:p-6 lg:p-8"
       style={{
         backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.75)), url(${slateBg})`,
+        backgroundAttachment: "fixed",
       }}
     >
       {/* New Listings Notification */}
