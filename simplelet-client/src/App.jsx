@@ -17,6 +17,7 @@ import ListingDetailPage from "./pages/ListingDetailPage";
 import ProfilePage from "./pages/ProfilePage";
 import FavoritesPage from "./pages/FavoritesPage";
 import LocationPermission from "./components/LocationPermission";
+import OnboardingModal from "./components/OnboardingModal"; // <-- Imported Onboarding Modal
 import "leaflet/dist/leaflet.css";
 
 function App() {
@@ -59,6 +60,9 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <Layout>
+          {/* First-time Onboarding Modal */}
+          <OnboardingModal />
+
           {/* Location Permission Prompt */}
           <LocationPermission
             onLocationGranted={handleLocationGranted}
