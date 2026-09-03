@@ -71,14 +71,14 @@ const getErrorMessage = (error, context = "edit_listing") => {
     listing_inactive: "⛔ This listing is no longer active.",
     unauthorized: "🚫 You don't have permission to edit this listing.",
     update_failed: "❌ Failed to update listing. Please try again.",
-    invalid_house_type: "🏠 Invalid property type selected.",
-    invalid_price: "💰 Please enter a valid price.",
-    price_negative: "💰 Price cannot be negative.",
-    invalid_phone: "📱 Invalid phone number format.",
+    invalid_house_type: " Invalid property type selected.",
+    invalid_price: " Please enter a valid price.",
+    price_negative: " Price cannot be negative.",
+    invalid_phone: " Invalid phone number format.",
     image_delete_failed: "❌ Failed to delete image. Please try again.",
     image_upload_failed: "❌ Failed to upload images. Please try again.",
     image_rejected: "🚫 Some images were rejected. Check the reasons below.",
-    network_error: "📡 Network error. Please check your connection.",
+    network_error: " Network error. Please check your connection.",
     server_error: "⚠️ Server error. Please try again later.",
   };
 
@@ -93,9 +93,9 @@ const getErrorMessage = (error, context = "edit_listing") => {
   if (status === 404) return "❌ Listing not found.";
   if (status === 409)
     return "⚠️ This listing has been modified by another user.";
-  if (status === 429) return "⏳ Too many attempts. Please wait a few minutes.";
+  if (status === 429) return " Too many attempts. Please wait a few minutes.";
   if (status === 500) return "⚠️ Server error. Please try again later.";
-  if (!error.response) return "📡 Network error. Please check your connection.";
+  if (!error.response) return " Network error. Please check your connection.";
 
   return (
     data?.message || data?.error || "❌ Something went wrong. Please try again."
@@ -407,7 +407,7 @@ export default function EditListingPage() {
     const errors = {};
 
     if (!formData.house_type) {
-      errors.house_type = "🏠 Please select a property type.";
+      errors.house_type = " Please select a property type.";
     }
 
     if (!formData.location || formData.location.length < 2) {
@@ -415,11 +415,11 @@ export default function EditListingPage() {
     }
 
     if (formData.price && isNaN(parseFloat(formData.price))) {
-      errors.price = "💰 Please enter a valid price.";
+      errors.price = " Please enter a valid price.";
     }
 
     if (formData.price && parseFloat(formData.price) < 0) {
-      errors.price = "💰 Price cannot be negative.";
+      errors.price = " Price cannot be negative.";
     }
 
     setValidationErrors(errors);
@@ -493,16 +493,16 @@ export default function EditListingPage() {
       return;
     }
 
-    console.log("📸 Raw file captured:", rawFile.name, rawFile.type, rawFile.size);
+    console.log(" Raw file captured:", rawFile.name, rawFile.type, rawFile.size);
 
     if (!rawFile.type.startsWith("image/")) {
-      toast.error("📸 Please select an image file.");
+      toast.error(" Please select an image file.");
       e.target.value = "";
       return;
     }
 
     if (rawFile.size > 15 * 1024 * 1024) {
-      toast.error("📸 Image exceeds 15MB limit.");
+      toast.error(" Image exceeds 15MB limit.");
       e.target.value = "";
       return;
     }
@@ -512,7 +512,7 @@ export default function EditListingPage() {
     try {
       // 1. Compress raw image while preserving EXIF metadata
       const compressedFile = await compressImage(rawFile);
-      console.log("📸 Optimized file size:", compressedFile.size, "bytes");
+      console.log(" Optimized file size:", compressedFile.size, "bytes");
 
       // 2. Fetch browser geolocation fallback
       try {
@@ -843,7 +843,7 @@ export default function EditListingPage() {
               </div>
             </div>
             <p className="text-[10px] text-gray-500 mt-2">
-              💰 Total monthly cost = Rent + Service Charge + Trash Fee
+               Total monthly cost = Rent + Service Charge + Trash Fee
             </p>
           </div>
 
@@ -948,7 +948,7 @@ export default function EditListingPage() {
           {/* ============ BUILDING FEATURES ============ */}
           <div className="border-b border-white/10 pb-6">
             <h2 className="text-sm font-semibold text-gray-300 mb-4">
-              🏢 Building Features
+               Building Features
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
