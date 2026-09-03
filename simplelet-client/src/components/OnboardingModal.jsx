@@ -16,7 +16,7 @@ const TOUR_STEPS = [
   {
     step: 1,
     badge: "Welcome",
-    title: "👋 Welcome to SimpleLet!",
+    title: " Welcome to SimpleLet!",
     description: "Your trusted platform for finding and listing properties in Kenya. Let us show you around!",
     icon: Sparkles,
     color: "from-blue-600 to-indigo-600",
@@ -25,7 +25,7 @@ const TOUR_STEPS = [
   {
     step: 2,
     badge: "Search",
-    title: "🔍 Browse Properties",
+    title: " Browse Properties",
     description: "Explore available properties with our smart search. Use filters to find exactly what you're looking for.",
     icon: Search,
     color: "from-indigo-600 to-purple-600",
@@ -43,7 +43,7 @@ const TOUR_STEPS = [
   {
     step: 4,
     badge: "Listing",
-    title: "📸 Post Your Property",
+    title: " Post Your Property",
     description: "Have a property to rent? Take photos with your camera, drop a pin on the map, and post your listing in minutes.",
     icon: Camera,
     color: "from-amber-500 to-orange-600",
@@ -61,7 +61,7 @@ const TOUR_STEPS = [
   {
     step: 6,
     badge: "Responsive",
-    title: "📱 Works on Any Device",
+    title: " Works on Any Device",
     description: "SimpleLet is fully responsive. Use it on your phone, tablet, or desktop - it works everywhere.",
     icon: Smartphone,
     color: "from-purple-600 to-pink-600",
