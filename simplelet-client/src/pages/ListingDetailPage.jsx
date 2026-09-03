@@ -51,19 +51,19 @@ const getErrorMessage = (error, context = "detail") => {
   const errorMap = {
     listing_not_found:
       "❌ This listing could not be found. It may have been removed or expired.",
-    listing_expired: "⏰ This listing has expired and is no longer available.",
+    listing_expired: " This listing has expired and is no longer available.",
     listing_inactive: "⛔ This listing is no longer active.",
     unauthorized: "🚫 You don't have permission to view this listing.",
     comment_failed: "❌ Failed to post comment. Please try again.",
     comment_too_short:
-      "📝 Your comment is too short. Please write at least 5 characters.",
+      " Your comment is too short. Please write at least 5 characters.",
     comment_too_long:
-      "📝 Your comment is too long. Please keep it under 1000 characters.",
+      " Your comment is too long. Please keep it under 1000 characters.",
     favorite_failed: "❌ Failed to update favorite. Please try again.",
     already_favorited: "❤️ This listing is already in your favorites.",
     not_favorited: "💔 This listing is not in your favorites.",
     network_error: "📡 Network error. Please check your connection.",
-    server_error: "⚠️ Server error. Please try again later.",
+    server_error: " Server error. Please try again later.",
   };
 
   if (errorCode && errorMap[errorCode]) {
@@ -76,9 +76,9 @@ const getErrorMessage = (error, context = "detail") => {
     return "🚫 You don't have permission to perform this action.";
   if (status === 404) return "❌ Listing not found.";
   if (status === 409) return "⚠️ This action could not be completed.";
-  if (status === 429) return "⏳ Too many attempts. Please wait a few minutes.";
+  if (status === 429) return " Too many attempts. Please wait a few minutes.";
   if (status === 500) return "⚠️ Server error. Please try again later.";
-  if (!error.response) return "📡 Network error. Please check your connection.";
+  if (!error.response) return " Network error. Please check your connection.";
 
   return (
     data?.message || data?.error || "❌ Something went wrong. Please try again."
@@ -177,7 +177,7 @@ export default function ListingDetailPage() {
     try {
       const { data } = await API.post(`/favorites/listings/${id}`);
       setIsFavorited(data.is_favorited);
-      toast.success(data.message || "❤️ Favorite updated!");
+      toast.success(data.message || " Favorite updated!");
     } catch (error) {
       const errorMsg = getErrorMessage(error, "favorite");
       toast.error(errorMsg);
@@ -272,15 +272,15 @@ export default function ListingDetailPage() {
       return;
     }
     if (!commentContent.trim()) {
-      toast.error("📝 Please enter a comment");
+      toast.error(" Please enter a comment");
       return;
     }
     if (commentContent.trim().length < 3) {
-      toast.error("📝 Comment must be at least 3 characters");
+      toast.error(" Comment must be at least 3 characters");
       return;
     }
     if (commentContent.length > 1000) {
-      toast.error("📝 Comment is too long (max 1000 characters)");
+      toast.error(" Comment is too long (max 1000 characters)");
       return;
     }
 
@@ -294,7 +294,7 @@ export default function ListingDetailPage() {
   const handleReviewSubmitted = () => {
     refetchReviews();
     refetchListing();
-    toast.success("⭐ Review submitted! Thank you for your feedback.");
+    toast.success(" Review submitted! Thank you for your feedback.");
   };
 
   // Safe location extraction and validation
@@ -567,7 +567,7 @@ export default function ListingDetailPage() {
               {listing.true_monthly_cost &&
                 listing.true_monthly_cost !== listing.price && (
                   <p className="text-xs text-gray-400 mt-1">
-                    💰 Total monthly: KSh{" "}
+                     Total monthly: KSh{" "}
                     {listing.true_monthly_cost.toLocaleString()}
                     (incl. service charge)
                   </p>
@@ -636,7 +636,7 @@ export default function ListingDetailPage() {
             {(listing.service_charge > 0 || listing.trash_fee > 0) && (
               <div className="border-t border-white/10 pt-4 mb-4">
                 <h3 className="text-sm font-semibold text-gray-300 mb-2">
-                  💰 Fees & Charges
+                   Fees & Charges
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   {listing.service_charge > 0 && (
@@ -735,7 +735,7 @@ export default function ListingDetailPage() {
               listing.has_fence) && (
               <div className="border-t border-white/10 pt-4 mb-4">
                 <h3 className="text-sm font-semibold text-gray-300 mb-2">
-                  🏢 Building Features
+                   Building Features
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {renderFeature("Elevator/Lift", listing.has_lift)}
@@ -757,7 +757,7 @@ export default function ListingDetailPage() {
               listing.gym_distance) && (
               <div className="border-t border-white/10 pt-4 mb-4">
                 <h3 className="text-sm font-semibold text-gray-300 mb-2">
-                  🚌 Commute & Logistics
+                   Commute & Logistics
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {listing.matatu_distance && (
@@ -910,7 +910,7 @@ export default function ListingDetailPage() {
                   )}
                   {listing.gym_distance && (
                     <span className="text-[10px] text-gray-500">
-                      💪 Gym: {listing.gym_distance}m
+                       Gym: {listing.gym_distance}m
                     </span>
                   )}
                 </div>
@@ -1017,7 +1017,7 @@ export default function ListingDetailPage() {
               {liveReviewViewers.length > 0 && (
                 <div className="mb-3">
                   <span className="text-[11px] rounded-full border border-yellow-400/20 bg-yellow-500/10 px-2 py-1 text-yellow-300">
-                    ⭐ {liveReviewViewers.length} live review viewer
+                     {liveReviewViewers.length} live review viewer
                     {liveReviewViewers.length === 1 ? "" : "s"}
                   </span>
                 </div>
@@ -1036,7 +1036,7 @@ export default function ListingDetailPage() {
             {/* Comments Section */}
             <div className="bg-black/30 backdrop-blur-sm rounded-2xl border border-white/10 p-4 sm:p-6 mt-6">
               <h3 className="text-lg font-semibold text-white mb-4">
-                💬 Comments
+                 Comments
                 {commentsData && (
                   <span className="text-sm text-gray-500 ml-2">
                     ({commentsData.total})
