@@ -67,24 +67,24 @@ const getErrorMessage = (error, context = "listing") => {
   const errorCode = data?.error_code || data?.error || "";
 
   const errorMap = {
-    house_type_required: "🏠 Please select a property type.",
+    house_type_required: " Please select a property type.",
     location_required: "📍 Please enter the property location.",
-    invalid_house_type: "🏠 Invalid property type selected.",
-    invalid_price: "💰 Please enter a valid price.",
-    price_negative: "💰 Price cannot be negative.",
-    invalid_phone: "📱 Invalid phone number format.",
+    invalid_house_type: " Invalid property type selected.",
+    invalid_price: " Please enter a valid price.",
+    price_negative: " Price cannot be negative.",
+    invalid_phone: " Invalid phone number format.",
     listing_creation_failed: "❌ Failed to create listing. Please try again.",
-    no_images: "📸 Please take at least one photo of the property.",
-    too_many_images: "📸 Maximum 10 images allowed.",
+    no_images: " Please take at least one photo of the property.",
+    too_many_images: " Maximum 10 images allowed.",
     image_upload_failed: "❌ Failed to upload images. Please try again.",
     image_rejected: "🚫 Some images were rejected. Check the reasons below.",
     no_gps: "📍 No GPS data found. Please drop a pin on the map.",
     location_mismatch: "📍 Photo location does not match the pin location.",
     camera_only:
-      "📸 Please use your camera to take photos (no gallery uploads).",
-    network_error: "📡 Network error. Please check your connection.",
+      " Please use your camera to take photos (no gallery uploads).",
+    network_error: " Network error. Please check your connection.",
     server_error: "⚠️ Server error. Please try again later.",
-    timeout: "⏳ Request timed out. Please try again.",
+    timeout: " Request timed out. Please try again.",
   };
 
   if (errorCode && errorMap[errorCode]) {
@@ -99,7 +99,7 @@ const getErrorMessage = (error, context = "listing") => {
   if (status === 409) return "⚠️ This listing already exists.";
   if (status === 429) return "⏳ Too many attempts. Please wait a few minutes.";
   if (status === 500) return "⚠️ Server error. Please try again later.";
-  if (!error.response) return "📡 Network error. Please check your connection.";
+  if (!error.response) return " Network error. Please check your connection.";
 
   return (
     data?.message || data?.error || "❌ Something went wrong. Please try again."
@@ -230,7 +230,7 @@ export default function CreateListingPage() {
       if (images.length > 0) {
         handleImageUpload(data.id);
       } else {
-        toast.success("🏠 Listing created successfully!");
+        toast.success(" Listing created successfully!");
         queryClient.invalidateQueries(["myListings"]);
         navigate("/dashboard");
       }
@@ -325,7 +325,7 @@ export default function CreateListingPage() {
     const errors = {};
 
     if (!formData.house_type) {
-      errors.house_type = "🏠 Please select a property type.";
+      errors.house_type = " Please select a property type.";
     }
 
     if (!formData.location || formData.location.length < 2) {
@@ -333,15 +333,15 @@ export default function CreateListingPage() {
     }
 
     if (formData.price && isNaN(parseFloat(formData.price))) {
-      errors.price = "💰 Please enter a valid price.";
+      errors.price = " Please enter a valid price.";
     }
 
     if (formData.price && parseFloat(formData.price) < 0) {
-      errors.price = "💰 Price cannot be negative.";
+      errors.price = " Price cannot be negative.";
     }
 
     if (images.length === 0) {
-      errors.images = "📸 Please take at least one photo at the property.";
+      errors.images = " Please take at least one photo at the property.";
     }
 
     if (!pinLocation) {
@@ -411,16 +411,16 @@ export default function CreateListingPage() {
       return;
     }
 
-    console.log("📸 Raw file captured:", rawFile.name, rawFile.type, rawFile.size);
+    console.log(" Raw file captured:", rawFile.name, rawFile.type, rawFile.size);
 
     if (!rawFile.type.startsWith("image/")) {
-      toast.error("📸 Please select an image file.");
+      toast.error(" Please select an image file.");
       e.target.value = "";
       return;
     }
 
     if (rawFile.size > 15 * 1024 * 1024) {
-      toast.error("📸 Image exceeds 15MB limit.");
+      toast.error(" Image exceeds 15MB limit.");
       e.target.value = "";
       return;
     }
@@ -430,7 +430,7 @@ export default function CreateListingPage() {
     try {
       // 1. Compress raw image while retaining EXIF headers
       const compressedFile = await compressImage(rawFile);
-      console.log("📸 Optimized file size:", compressedFile.size, "bytes");
+      console.log(" Optimized file size:", compressedFile.size, "bytes");
 
       // 2. Fetch browser geolocation fallback
       try {
@@ -474,7 +474,7 @@ export default function CreateListingPage() {
       setValidationErrors((prev) => ({ ...prev, images: null }));
 
       toast.success(
-        `📸 Photo processed! (${(compressedFile.size / 1024).toFixed(0)}KB)`,
+        ` Photo processed! (${(compressedFile.size / 1024).toFixed(0)}KB)`,
         { id: loadingToastId }
       );
     } catch (error) {
@@ -605,7 +605,7 @@ export default function CreateListingPage() {
             )}
             {isGettingLocation && (
               <div className="mt-4 p-3 rounded-lg text-sm bg-blue-500/10 border border-blue-500/30 text-blue-400">
-                📡 Getting your location...
+                 Getting your location...
               </div>
             )}
 
@@ -730,7 +730,7 @@ export default function CreateListingPage() {
               </div>
             </div>
             <p className="text-[10px] text-gray-500 mt-2">
-              💰 Total monthly cost = Rent + Service Charge + Trash Fee
+               Total monthly cost = Rent + Service Charge + Trash Fee
             </p>
           </div>
 
@@ -835,7 +835,7 @@ export default function CreateListingPage() {
           {/* ============ BUILDING FEATURES ============ */}
           <div className="border-b border-white/10 pb-6">
             <h2 className="text-sm font-semibold text-gray-300 mb-4">
-              🏢 Building Features
+               Building Features
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
@@ -904,7 +904,7 @@ export default function CreateListingPage() {
           {/* ============ COMMUTE & LOGISTICS ============ */}
           <div className="border-b border-white/10 pb-6">
             <h2 className="text-sm font-semibold text-gray-300 mb-4">
-              🚌 Commute & Logistics
+               Commute & Logistics
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -993,7 +993,7 @@ export default function CreateListingPage() {
           {/* ============ IMAGE UPLOAD ============ */}
           <div>
             <label className="label">
-              📸 Take Photos of the Property
+               Take Photos of the Property
               <span className="text-xs text-red-400 ml-2">
                 * Camera only - No gallery uploads
               </span>
@@ -1053,7 +1053,7 @@ export default function CreateListingPage() {
                         className="w-full h-24 object-cover rounded-lg border border-white/10"
                       />
                       <span className="absolute top-1 left-1 bg-blue-500/80 text-white text-[8px] px-1.5 py-0.5 rounded">
-                        📸 Camera
+                         Camera
                       </span>
                       <button
                         type="button"
