@@ -1,5 +1,5 @@
 // src/pages/HomePage.jsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import API from "../services/api";
@@ -51,9 +51,8 @@ const fetchListings = async (params) => {
 export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // ============ DEBOUNCE SEARCH ============
+  // Separate state for search input (local only, no API trigger)
   const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
-  const debounceTimerRef = useRef(null);
 
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || "",
@@ -97,31 +96,6 @@ export default function HomePage() {
     }
   }, [error]);
 
-  // ============ DEBOUNCE SEARCH HANDLER ============
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-    setSearchInput(value);
-
-    // Clear previous timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    // Set new timer
-    debounceTimerRef.current = setTimeout(() => {
-      setFilters((prev) => ({ ...prev, search: value }));
-    }, 500); // 500ms delay
-  };
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, []);
-
   // Update URL params when filters change
   useEffect(() => {
     const params = new URLSearchParams();
@@ -131,19 +105,25 @@ export default function HomePage() {
     setSearchParams(params);
   }, [filters, setSearchParams]);
 
+  // ============ HANDLERS ============
+
+  // Update search input (local state only) – does NOT trigger API
+  const handleSearchInputChange = (e) => {
+    setSearchInput(e.target.value);
+  };
+
+  // On form submit: update filters.search and refetch
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    setFilters((prev) => ({ ...prev, search: searchInput }));
+    refetch();
+  };
+
+  // Handle filter dropdown/input changes (non-search)
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    // If there's a pending debounce, apply it immediately
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      setFilters((prev) => ({ ...prev, search: searchInput }));
-    }
-    refetch();
+    // Refetch automatically because filters changed and useQuery will detect
   };
 
   const clearFilters = () => {
@@ -159,6 +139,7 @@ export default function HomePage() {
     setSearchInput("");
     setShowNearby(false);
     setUserLocation(null);
+    refetch();
   };
 
   // ============ GET USER LOCATION FOR NEARBY SEARCH ============
@@ -328,7 +309,7 @@ export default function HomePage() {
               placeholder="Search properties..."
               className="flex-1 input"
               value={searchInput}
-              onChange={handleSearchChange}
+              onChange={handleSearchInputChange}
             />
             <button type="submit" className="btn-primary w-full sm:w-auto">
               <svg
