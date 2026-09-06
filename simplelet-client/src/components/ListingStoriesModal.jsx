@@ -25,6 +25,20 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
   const timerRef = useRef(null);
   const STORY_DURATION = 5000;
 
+  // Whenever the modal opens, pick a random starting post if no explicit initialIndex was selected
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentImageIndex(0);
+      setProgress(0);
+      if (listings.length > 0) {
+        const randomIndex = Math.floor(Math.random() * listings.length);
+        setCurrentListingIndex(randomIndex);
+      } else {
+        setCurrentListingIndex(initialIndex);
+      }
+    }
+  }, [isOpen, listings.length]);
+
   const currentListing = listings[currentListingIndex] || null;
   const listingId = currentListing?.id || currentListing?._id;
 
@@ -44,10 +58,6 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
 
   const token = localStorage.getItem("token");
   const isLoggedIn = !!token;
-
-  useEffect(() => {
-    setCurrentListingIndex(initialIndex);
-  }, [initialIndex]);
 
   useEffect(() => {
     setCurrentImageIndex(0);
@@ -94,7 +104,9 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
       if (currentListingIndex < listings.length - 1) {
         setCurrentListingIndex((prev) => prev + 1);
       } else {
-        onClose();
+        // Loop around randomly instead of closing immediately when at the end
+        const nextRandomIndex = Math.floor(Math.random() * listings.length);
+        setCurrentListingIndex(nextRandomIndex);
       }
     }
   };
@@ -129,8 +141,7 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
       return;
     }
     onClose();
-    // ============ FIX: Remove the 's' from 'listings' ============
-    navigate(`/listing/${listingId}`);  // ← Changed from '/listings/'
+    navigate(`/listing/${listingId}`);
   };
 
   const toggleFavorite = async (e) => {
@@ -156,7 +167,7 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
     e.stopPropagation();
     if (!listingId) return;
 
-    const url = `${window.location.origin}/listing/${listingId}`;  // ← Also fixed here
+    const url = `${window.location.origin}/listing/${listingId}`;
     if (navigator.share) {
       navigator.share({
         title: currentListing?.title,
