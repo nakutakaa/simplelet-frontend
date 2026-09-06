@@ -1,5 +1,5 @@
 // src/pages/HomePage.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import API from "../services/api";
@@ -47,9 +47,27 @@ const fetchListings = async (params) => {
 
 export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const searchInputRef = useRef(null);
 
-  // Local form state for fast, lag-free user input typing
-  const [formState, setFormState] = useState({
+  // ============ FIX: Separate search query from active filters ============
+  // searchQuery - what the user types (no API calls)
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
+  
+  // activeSearch - ONLY updated when user clicks Search or presses Enter
+  const [activeSearch, setActiveSearch] = useState(searchParams.get("search") || "");
+
+  // Other filters (these still update immediately, but don't trigger API calls alone)
+  const [filters, setFilters] = useState({
+    house_type: searchParams.get("house_type") || "",
+    location: searchParams.get("location") || "",
+    price_min: searchParams.get("price_min") || "",
+    price_max: searchParams.get("price_max") || "",
+    sort_by: searchParams.get("sort_by") || "newest",
+    nearby: searchParams.get("nearby") || "",
+  });
+
+  // Active filters that trigger API calls
+  const [activeFilters, setActiveFilters] = useState({
     search: searchParams.get("search") || "",
     house_type: searchParams.get("house_type") || "",
     location: searchParams.get("location") || "",
@@ -59,9 +77,6 @@ export default function HomePage() {
     nearby: searchParams.get("nearby") || "",
   });
 
-  // Active query filters state - ONLY this state triggers React Query and URL updates
-  const [activeFilters, setActiveFilters] = useState(formState);
-
   const [userLocation, setUserLocation] = useState(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [showNearby, setShowNearby] = useState(Boolean(searchParams.get("nearby")));
@@ -70,7 +85,7 @@ export default function HomePage() {
   const userId = currentUser?.id || currentUser?.user_id || null;
   const { newListings } = useRealTimeListings(null, userId, activeFilters);
 
-  // Query only fires when activeFilters change (not on raw input typing)
+  // Query only fires when activeFilters change
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["listings", activeFilters],
     queryFn: () => fetchListings(activeFilters),
@@ -89,49 +104,65 @@ export default function HomePage() {
   });
   const uniqueListings = Array.from(uniqueListingsMap.values());
 
-  // Debounce typed text inputs (500ms delay before triggering query/URL update)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setActiveFilters(formState);
-    }, 500);
+  // ============ FIX: ONLY update URL and active filters when search is submitted ============
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    const newActive = {
+      ...filters,
+      search: searchQuery,  // Use the current search query
+    };
+    setActiveFilters(newActive);
+    setActiveSearch(searchQuery);
+    updateURL(newActive);
+  };
 
-    return () => clearTimeout(timer);
-  }, [formState]);
+  // ============ FIX: Handle Enter key on search input ============
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const newActive = {
+        ...filters,
+        search: searchQuery,
+      };
+      setActiveFilters(newActive);
+      setActiveSearch(searchQuery);
+      updateURL(newActive);
+    }
+  };
 
-  // Sync URL search params only when activeFilters change
-  useEffect(() => {
+  // ============ Update URL ============
+  const updateURL = (filtersToUpdate) => {
     const params = new URLSearchParams();
-    Object.entries(activeFilters).forEach(([key, value]) => {
+    Object.entries(filtersToUpdate).forEach(([key, value]) => {
       if (value) params.set(key, value);
     });
     setSearchParams(params, { replace: true });
-  }, [activeFilters, setSearchParams]);
+  };
 
-  useEffect(() => {
-    if (error) {
-      toast.error("Failed to load listings");
+  // ============ Handle filter changes (without triggering API) ============
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    const updatedFilters = { ...filters, [name]: value };
+    setFilters(updatedFilters);
+    
+    // For dropdowns, update active filters immediately (except search)
+    if (name !== "search") {
+      const newActive = {
+        ...updatedFilters,
+        search: searchQuery,
+      };
+      setActiveFilters(newActive);
+      updateURL(newActive);
     }
-  }, [error]);
-
-  // Handles fast local input state changes without triggering re-fetches
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormState((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Instant update for select dropdowns
-  const handleSelectChange = (e) => {
-    const { name, value } = e.target;
-    const updated = { ...formState, [name]: value };
-    setFormState(updated);
-    setActiveFilters(updated);
+  // ============ Handle search input change (NO API CALL) ============
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
   };
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    setActiveFilters(formState);
-  };
-
+  // ============ Clear all filters ============
   const clearFilters = () => {
     const reset = {
       search: "",
@@ -142,10 +173,13 @@ export default function HomePage() {
       sort_by: "newest",
       nearby: "",
     };
-    setFormState(reset);
+    setSearchQuery("");
+    setActiveSearch("");
+    setFilters(reset);
     setActiveFilters(reset);
     setShowNearby(false);
     setUserLocation(null);
+    updateURL(reset);
   };
 
   // ============ GET USER LOCATION FOR NEARBY SEARCH ============
@@ -157,13 +191,18 @@ export default function HomePage() {
           const { latitude, longitude } = position.coords;
           setUserLocation({ lat: latitude, lng: longitude });
           setShowNearby(true);
-          const updated = {
-            ...formState,
+          const updatedFilters = {
+            ...filters,
             nearby: `${latitude},${longitude}`,
             sort_by: "distance",
           };
-          setFormState(updated);
-          setActiveFilters(updated);
+          setFilters(updatedFilters);
+          const newActive = {
+            ...updatedFilters,
+            search: searchQuery,
+          };
+          setActiveFilters(newActive);
+          updateURL(newActive);
           toast.success("📍 Location found! Showing nearby listings.");
           setIsGettingLocation(false);
         },
@@ -186,7 +225,7 @@ export default function HomePage() {
   };
 
   const renderSuggestions = () => {
-    const currentType = formState.house_type;
+    const currentType = filters.house_type;
     if (!currentType) return null;
 
     const similarTypes = getSimilarTypes(currentType);
@@ -200,9 +239,14 @@ export default function HomePage() {
             key={type}
             type="button"
             onClick={() => {
-              const updated = { ...formState, house_type: type };
-              setFormState(updated);
-              setActiveFilters(updated);
+              const updatedFilters = { ...filters, house_type: type };
+              setFilters(updatedFilters);
+              const newActive = {
+                ...updatedFilters,
+                search: searchQuery,
+              };
+              setActiveFilters(newActive);
+              updateURL(newActive);
             }}
             className="text-xs bg-white/5 hover:bg-white/10 text-gray-300 px-2 py-0.5 rounded-full border border-white/10 transition"
           >
@@ -251,6 +295,15 @@ export default function HomePage() {
     return icons[badge.level] || "⚪";
   };
 
+  // ============ Initialize from URL params ============
+  useEffect(() => {
+    const search = searchParams.get("search") || "";
+    if (search) {
+      setSearchQuery(search);
+      setActiveSearch(search);
+    }
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -281,7 +334,6 @@ export default function HomePage() {
         backgroundAttachment: "fixed",
       }}
     >
-      {/* New Listings Notification */}
       {newListings.length > 0 && (
         <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between backdrop-blur-sm">
           <span className="text-sm text-emerald-300 flex items-center gap-2">
@@ -305,12 +357,14 @@ export default function HomePage() {
         <form onSubmit={handleSearchSubmit} className="space-y-3 sm:space-y-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <input
+              ref={searchInputRef}
               type="text"
               name="search"
               placeholder="Search properties..."
               className="flex-1 input"
-              value={formState.search}
-              onChange={handleInputChange}
+              value={searchQuery}
+              onChange={handleSearchChange}
+              onKeyDown={handleSearchKeyDown}
             />
             <button type="submit" className="btn-primary w-full sm:w-auto">
               <svg
@@ -335,8 +389,8 @@ export default function HomePage() {
               <label className="label">Type</label>
               <select
                 name="house_type"
-                value={formState.house_type}
-                onChange={handleSelectChange}
+                value={filters.house_type}
+                onChange={handleFilterChange}
                 className="input"
               >
                 {HOUSE_TYPES.map((type) => (
@@ -352,8 +406,8 @@ export default function HomePage() {
               <input
                 type="text"
                 name="location"
-                value={formState.location}
-                onChange={handleInputChange}
+                value={filters.location}
+                onChange={handleFilterChange}
                 placeholder="e.g., Kilimani"
                 className="input"
               />
@@ -364,8 +418,8 @@ export default function HomePage() {
               <input
                 type="number"
                 name="price_min"
-                value={formState.price_min}
-                onChange={handleInputChange}
+                value={filters.price_min}
+                onChange={handleFilterChange}
                 placeholder="0"
                 className="input"
               />
@@ -376,8 +430,8 @@ export default function HomePage() {
               <input
                 type="number"
                 name="price_max"
-                value={formState.price_max}
-                onChange={handleInputChange}
+                value={filters.price_max}
+                onChange={handleFilterChange}
                 placeholder="1000000"
                 className="input"
               />
@@ -387,8 +441,8 @@ export default function HomePage() {
               <label className="label">Sort By</label>
               <select
                 name="sort_by"
-                value={formState.sort_by}
-                onChange={handleSelectChange}
+                value={filters.sort_by}
+                onChange={handleFilterChange}
                 className="input"
               >
                 {SORT_OPTIONS.map((option) => (
@@ -432,13 +486,18 @@ export default function HomePage() {
                 onClick={() => {
                   setShowNearby(false);
                   setUserLocation(null);
-                  const updated = {
-                    ...formState,
+                  const updatedFilters = {
+                    ...filters,
                     nearby: "",
                     sort_by: "newest",
                   };
-                  setFormState(updated);
-                  setActiveFilters(updated);
+                  setFilters(updatedFilters);
+                  const newActive = {
+                    ...updatedFilters,
+                    search: searchQuery,
+                  };
+                  setActiveFilters(newActive);
+                  updateURL(newActive);
                 }}
                 className="text-xs text-red-400 hover:text-red-300 transition"
               >
@@ -457,21 +516,21 @@ export default function HomePage() {
           {renderSuggestions()}
 
           {/* Active Filters Summary */}
-          {(formState.search ||
-            formState.house_type ||
-            formState.location ||
-            formState.price_min ||
-            formState.price_max ||
+          {(activeFilters.search ||
+            activeFilters.house_type ||
+            activeFilters.location ||
+            activeFilters.price_min ||
+            activeFilters.price_max ||
             showNearby) && (
             <div className="flex flex-col sm:flex-row justify-between items-center gap-2 border-t border-white/10 pt-3">
               <span className="text-xs text-gray-500">
                 {data?.total || 0} results found
                 {showNearby && " 📍 Nearby"}
-                {formState.house_type &&
-                  ` • ${HOUSE_TYPES.find((t) => t.value === formState.house_type)?.label}`}
-                {formState.location && ` • 📍 ${formState.location}`}
-                {formState.price_min && ` • From KSh ${formState.price_min}`}
-                {formState.price_max && ` • To KSh ${formState.price_max}`}
+                {activeFilters.house_type &&
+                  ` • ${HOUSE_TYPES.find((t) => t.value === activeFilters.house_type)?.label}`}
+                {activeFilters.location && ` • 📍 ${activeFilters.location}`}
+                {activeFilters.price_min && ` • From KSh ${activeFilters.price_min}`}
+                {activeFilters.price_max && ` • To KSh ${activeFilters.price_max}`}
               </span>
               <button
                 type="button"
@@ -515,13 +574,18 @@ export default function HomePage() {
               onClick={() => {
                 setShowNearby(false);
                 setUserLocation(null);
-                const updated = {
-                  ...formState,
+                const updatedFilters = {
+                  ...filters,
                   nearby: "",
                   sort_by: "newest",
                 };
-                setFormState(updated);
-                setActiveFilters(updated);
+                setFilters(updatedFilters);
+                const newActive = {
+                  ...updatedFilters,
+                  search: searchQuery,
+                };
+                setActiveFilters(newActive);
+                updateURL(newActive);
               }}
               className="btn-outline text-sm mt-4"
             >
