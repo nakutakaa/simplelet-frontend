@@ -10,89 +10,51 @@ import ReviewSection from "../components/ReviewSection";
 import WhatsAppButton from "../components/WhatsAppButton";
 import CredibilityBadge from "../components/CredibilityBadge";
 import SafetyTip from "../components/SafetyTip";
-import SimpleAmbientBackground from "../components/SimpleAmbientBackground";
 import FullScreenMap from "../components/FullScreenMap";
 import { useRealTimeComments, useRealTimeReviews } from "../hooks";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { ArrowsPointingOutIcon } from "@heroicons/react/24/outline";
+import { ArrowsPointingOutIcon, HeartIcon, ShareIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 
-// Fix for default marker icons in Leaflet with React
+// Leaflet default icon fix
 delete L.Icon.Default.prototype._getIconUrl;
-const defaultIcon = new L.Icon.Default();
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-// Custom green marker for verified location
 const verifiedPinIcon = new L.Icon({
-  iconUrl:
-    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
 
-// ============ ERROR MESSAGES ============
-const getErrorMessage = (error, context = "detail") => {
+const getErrorMessage = (error) => {
   const status = error.response?.status;
   const data = error.response?.data;
   const errorCode = data?.error_code || data?.error || "";
 
   const errorMap = {
-    listing_not_found:
-      "❌ This listing could not be found. It may have been removed or expired.",
-    listing_expired: " This listing has expired and is no longer available.",
-    listing_inactive: "⛔ This listing is no longer active.",
-    unauthorized: "🚫 You don't have permission to view this listing.",
-    comment_failed: "❌ Failed to post comment. Please try again.",
-    comment_too_short:
-      " Your comment is too short. Please write at least 5 characters.",
-    comment_too_long:
-      " Your comment is too long. Please keep it under 1000 characters.",
-    favorite_failed: "❌ Failed to update favorite. Please try again.",
-    already_favorited: "❤️ This listing is already in your favorites.",
-    not_favorited: "💔 This listing is not in your favorites.",
-    network_error: "📡 Network error. Please check your connection.",
-    server_error: " Server error. Please try again later.",
+    listing_not_found: "❌ Listing not found.",
+    listing_expired: "⌛ This listing has expired.",
+    comment_failed: "❌ Failed to post comment.",
   };
 
-  if (errorCode && errorMap[errorCode]) {
-    return errorMap[errorCode];
-  }
-
-  if (status === 400) return "⚠️ Please check your information and try again.";
-  if (status === 401) return "🔒 Please login to perform this action.";
-  if (status === 403)
-    return "🚫 You don't have permission to perform this action.";
-  if (status === 404) return "❌ Listing not found.";
-  if (status === 409) return "⚠️ This action could not be completed.";
-  if (status === 429) return " Too many attempts. Please wait a few minutes.";
-  if (status === 500) return "⚠️ Server error. Please try again later.";
-  if (!error.response) return " Network error. Please check your connection.";
-
-  return (
-    data?.message || data?.error || "❌ Something went wrong. Please try again."
-  );
+  if (errorCode && errorMap[errorCode]) return errorMap[errorCode];
+  if (status === 401) return "🔒 Please login to continue.";
+  return data?.message || data?.error || "❌ Something went wrong.";
 };
 
-// Helper function to get optimized Cloudinary URL
-const getOptimizedImageUrl = (url, width = 800, height = 600) => {
+const getOptimizedImageUrl = (url, width = 1000, height = 750) => {
   if (!url) return "";
   if (url.includes("cloudinary.com")) {
-    return url.replace(
-      "/upload/",
-      `/upload/w_${width},h_${height},c_limit,q_auto,f_auto/`,
-    );
+    return url.replace("/upload/", `/upload/w_${width},h_${height},c_limit,q_auto,f_auto/`);
   }
   return url;
 };
@@ -100,41 +62,21 @@ const getOptimizedImageUrl = (url, width = 800, height = 600) => {
 const getThumbnailUrl = (url) => {
   if (!url) return "";
   if (url.includes("cloudinary.com")) {
-    return url.replace("/upload/", "/upload/w_150,h_150,c_fill,q_auto,f_auto/");
+    return url.replace("/upload/", "/upload/w_200,h_200,c_fill,q_auto,f_auto/");
   }
   return url;
 };
 
-// Fetch listing details
-const fetchListing = async (id) => {
-  const { data } = await API.get(`/listings/${id}`);
-  return data;
-};
-
-// Fetch comments
-const fetchComments = async (listingId) => {
-  const { data } = await API.get(`/comments/listings/${listingId}/comments`);
-  return data;
-};
-
-// Fetch reviews
-const fetchReviews = async (listingId) => {
-  const { data } = await API.get(`/reviews/listings/${listingId}`);
-  return data;
-};
-
-// Post comment
-const postComment = async ({ listingId, content }) => {
-  const { data } = await API.post(`/comments/listings/${listingId}/comments`, {
-    content,
-  });
-  return data;
-};
+const fetchListing = async (id) => (await API.get(`/listings/${id}`)).data;
+const fetchComments = async (listingId) => (await API.get(`/comments/listings/${listingId}/comments`)).data;
+const fetchReviews = async (listingId) => (await API.get(`/reviews/listings/${listingId}`)).data;
+const postComment = async ({ listingId, content }) => (await API.post(`/comments/listings/${listingId}/comments`, { content })).data;
 
 export default function ListingDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
   const [showContact, setShowContact] = useState(false);
   const [swiperOpen, setSwiperOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -143,17 +85,14 @@ export default function ListingDetailPage() {
   const [isCommenting, setIsCommenting] = useState(false);
   const [isMapFullScreen, setIsMapFullScreen] = useState(false);
 
-  // Check if user is logged in
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "null");
   const isLoggedIn = !!token && user;
   const userId = user?.id || user?.user_id || null;
-  const { comments: liveComments, viewers: liveCommentViewers } =
-    useRealTimeComments(id, userId);
-  const { viewers: liveReviewViewers, eventsCount: liveReviewEventsCount } =
-    useRealTimeReviews(id, userId);
 
-  // Check favorite status
+  const { comments: liveComments } = useRealTimeComments(id, userId);
+  const { viewers: liveReviewViewers, eventsCount: liveReviewEventsCount } = useRealTimeReviews(id, userId);
+
   useEffect(() => {
     const checkFavorite = async () => {
       if (!id || !isLoggedIn) return;
@@ -167,62 +106,42 @@ export default function ListingDetailPage() {
     checkFavorite();
   }, [id, isLoggedIn]);
 
-  // Toggle favorite
   const toggleFavorite = async () => {
     if (!isLoggedIn) {
-      toast.error("🔒 Please login to save favorites");
+      toast.error("🔒 Please login to save listings");
       navigate("/login");
       return;
     }
     try {
       const { data } = await API.post(`/favorites/listings/${id}`);
       setIsFavorited(data.is_favorited);
-      toast.success(data.message || " Favorite updated!");
+      toast.success(data.message || "Favorite updated!");
     } catch (error) {
-      const errorMsg = getErrorMessage(error, "favorite");
-      toast.error(errorMsg);
+      toast.error(getErrorMessage(error));
     }
   };
 
-  // Fetch listing data
-  const {
-    data: listing,
-    isLoading,
-    error,
-    refetch: refetchListing,
-  } = useQuery({
+  const { data: listing, isLoading, error, refetch: refetchListing } = useQuery({
     queryKey: ["listing", id],
     queryFn: () => fetchListing(id),
     retry: 1,
   });
 
-  // Fetch comments
-  const {
-    data: commentsData,
-    isLoading: commentsLoading,
-    refetch: refetchComments,
-  } = useQuery({
+  const { data: commentsData, isLoading: commentsLoading, refetch: refetchComments } = useQuery({
     queryKey: ["comments", id],
     queryFn: () => fetchComments(id),
     enabled: !!id,
   });
 
-  useEffect(() => {
-    if (liveComments.length > 0) {
-      refetchComments();
-    }
-  }, [liveComments.length, refetchComments]);
-
-  // Fetch reviews
-  const {
-    data: reviewsData,
-    isLoading: reviewsLoading,
-    refetch: refetchReviews,
-  } = useQuery({
+  const { data: reviewsData, isLoading: reviewsLoading, refetch: refetchReviews } = useQuery({
     queryKey: ["reviews", id],
     queryFn: () => fetchReviews(id),
     enabled: !!id,
   });
+
+  useEffect(() => {
+    if (liveComments.length > 0) refetchComments();
+  }, [liveComments.length, refetchComments]);
 
   useEffect(() => {
     if (liveReviewEventsCount > 0) {
@@ -231,7 +150,6 @@ export default function ListingDetailPage() {
     }
   }, [liveReviewEventsCount, refetchReviews, refetchListing]);
 
-  // Post comment mutation
   const commentMutation = useMutation({
     mutationFn: postComment,
     onSuccess: () => {
@@ -241,21 +159,29 @@ export default function ListingDetailPage() {
       queryClient.invalidateQueries(["comments", id]);
       refetchComments();
     },
-    onError: (error) => {
-      const errorMsg = getErrorMessage(error, "comment");
-      toast.error(errorMsg);
+    onError: (err) => {
+      toast.error(getErrorMessage(err));
       setIsCommenting(false);
     },
   });
 
-  const handleContactClick = () => {
-    setShowContact(true);
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: listing?.title,
+        text: `Check out this listing on SimpleLet: ${listing?.title}`,
+        url: window.location.href,
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      toast.success("🔗 Link copied to clipboard!");
+    }
   };
 
   const handleCopyPhone = () => {
     if (listing?.contact_phone) {
       navigator.clipboard.writeText(listing.contact_phone);
-      toast.success("📋 Phone number copied to clipboard!");
+      toast.success("📋 Phone number copied!");
     }
   };
 
@@ -266,41 +192,15 @@ export default function ListingDetailPage() {
 
   const handleCommentSubmit = (e) => {
     e.preventDefault();
-    if (!isLoggedIn) {
-      toast.error("🔒 Please login to comment");
-      navigate("/login");
-      return;
-    }
-    if (!commentContent.trim()) {
-      toast.error(" Please enter a comment");
-      return;
-    }
-    if (commentContent.trim().length < 3) {
-      toast.error(" Comment must be at least 3 characters");
-      return;
-    }
-    if (commentContent.length > 1000) {
-      toast.error(" Comment is too long (max 1000 characters)");
-      return;
-    }
+    if (!isLoggedIn) return navigate("/login");
+    if (!commentContent.trim()) return toast.error("Please enter a comment");
 
     setIsCommenting(true);
-    commentMutation.mutate({
-      listingId: id,
-      content: commentContent,
-    });
+    commentMutation.mutate({ listingId: id, content: commentContent });
   };
 
-  const handleReviewSubmitted = () => {
-    refetchReviews();
-    refetchListing();
-    toast.success(" Review submitted! Thank you for your feedback.");
-  };
-
-  // Safe location extraction and validation
   const getMapLocation = () => {
     let lat, lng, source;
-
     if (listing?.pin_latitude != null && listing?.pin_longitude != null) {
       lat = parseFloat(listing.pin_latitude);
       lng = parseFloat(listing.pin_longitude);
@@ -310,11 +210,7 @@ export default function ListingDetailPage() {
       lng = parseFloat(listing.longitude);
       source = "gps";
     }
-
-    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
-      return null;
-    }
-
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return null;
     return { lat, lng, source };
   };
 
@@ -324,37 +220,16 @@ export default function ListingDetailPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
       </div>
     );
   }
 
-  if (error) {
-    const errorMsg = getErrorMessage(error, "fetch");
-    toast.error(errorMsg);
-
+  if (error || !listing) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-400">{errorMsg}</p>
-        <div className="flex justify-center gap-3 mt-4">
-          <button onClick={() => refetchListing()} className="btn-primary">
-            Retry
-          </button>
-          <button onClick={() => navigate("/")} className="btn-outline">
-            Back to Home
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!listing) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-red-400">❌ Listing not found</p>
-        <button onClick={() => navigate("/")} className="btn-primary mt-4">
-          Back to Home
-        </button>
+        <p className="text-red-400">{error ? getErrorMessage(error) : "❌ Listing not found"}</p>
+        <button onClick={() => navigate("/")} className="btn-primary mt-4">Back to Home</button>
       </div>
     );
   }
@@ -362,764 +237,303 @@ export default function ListingDetailPage() {
   const hasImages = listing.images && listing.images.length > 0;
   const author = listing.author || {};
   const isExpired = listing.is_expired || false;
-  const expiryStatus = listing.expiry_status || "active";
-  const expiryStatusText = listing.expiry_status_text || "Active";
-  const daysRemaining = listing.days_remaining;
   const isLocationVerified = Boolean(listing.location_verified || listing.pin_verified);
-
-  // Helper to render feature check
-  const renderFeature = (label, value) => {
-    if (value === undefined || value === null) return null;
-    return (
-      <span className={`text-xs ${value ? "text-green-400" : "text-gray-500"}`}>
-        {value ? "✅" : "❌"} {label}
-      </span>
-    );
-  };
-
-  // Get cover image for ambient background
-  const coverImage = hasImages ? listing.images[0].url : null;
+  const mainCover = hasImages ? listing.images[0].url : "";
 
   return (
-    <>
-      <SimpleAmbientBackground
-        imageUrl={coverImage}
-        intensity={0.3}
-        blur={80}
-        className="min-h-screen"
-      >
-        <div className="max-w-4xl mx-auto pb-8">
-          {/* Image Gallery */}
-          <div className="bg-black/30 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden mb-6">
-            {hasImages ? (
-              <div>
-                <div
-                  className="relative cursor-pointer group"
-                  onClick={() => openImageSwiper(0)}
-                >
-                  <img
-                    src={getOptimizedImageUrl(listing.images[0].url, 800, 600)}
-                    alt={listing.title}
-                    className="w-full h-[400px] object-cover"
-                    loading="eager"
-                  />
-                  {listing.images.length > 1 && (
-                    <div className="absolute bottom-4 right-4 bg-black/60 text-white text-sm px-3 py-1 rounded-full">
-                      {listing.images.length} photos
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
-                    <span className="opacity-0 group-hover:opacity-100 text-white text-sm bg-black/50 px-3 py-1 rounded-full transition">
-                      Tap to view gallery
-                    </span>
-                  </div>
+    <div className="min-h-screen bg-[#121212] text-white -mt-4 sm:-mt-8 -mx-3 sm:-mx-6 lg:-mx-8">
+      {/* Dynamic Spotify Ambient Hero Section */}
+      <div className="relative w-full bg-gradient-to-b from-emerald-900/40 via-[#121212]/90 to-[#121212] pt-8 pb-6 px-4 sm:px-8 overflow-hidden">
+        {/* Ambient Blur Layer derived from Cover Image */}
+        {mainCover && (
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-25 blur-3xl scale-125 pointer-events-none transition-all duration-700"
+            style={{ backgroundImage: `url(${mainCover})` }}
+          />
+        )}
+
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="flex flex-col md:flex-row items-center md:items-end gap-6 sm:gap-8">
+            
+            {/* Spotify Album-Art Cover Preview Frame */}
+            <div 
+              onClick={() => hasImages && openImageSwiper(0)}
+              className="relative w-56 h-56 sm:w-64 sm:h-64 lg:w-72 lg:h-72 flex-shrink-0 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] cursor-pointer group border border-white/10"
+            >
+              {hasImages ? (
+                <img
+                  src={getOptimizedImageUrl(mainCover, 800, 800)}
+                  alt={listing.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                />
+              ) : (
+                <div className="w-full h-full bg-[#282828] flex items-center justify-center text-gray-500">
+                  No Image Available
                 </div>
-                {listing.images.length > 1 && (
-                  <div className="flex gap-2 p-2 overflow-x-auto">
-                    {listing.images.slice(0, 5).map((image, idx) => (
-                      <button
-                        key={image.id}
-                        onClick={() => openImageSwiper(idx)}
-                        className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 transition"
-                      >
-                        <img
-                          src={getThumbnailUrl(image.url)}
-                          alt={`Thumb ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      </button>
-                    ))}
-                    {listing.images.length > 5 && (
-                      <button
-                        onClick={() => openImageSwiper(5)}
-                        className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-[#1a1a1a] flex items-center justify-center text-white text-sm border border-white/10 hover:border-blue-500 transition"
-                      >
-                        +{listing.images.length - 5}
-                      </button>
-                    )}
-                  </div>
-                )}
+              )}
+              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <span className="bg-black/70 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full font-medium">
+                  🔍 View Gallery ({listing.images?.length || 0})
+                </span>
               </div>
-            ) : (
-              <div className="h-[400px] bg-[#0a0a0a] flex items-center justify-center">
-                <svg
-                  className="w-24 h-24 text-gray-700"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1}
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
+            </div>
+
+            {/* Header Track Details */}
+            <div className="flex-1 text-center md:text-left space-y-3">
+              <div className="flex items-center justify-center md:justify-start gap-2 text-xs font-bold tracking-wider uppercase text-emerald-400">
+                <SparklesIcon className="w-4 h-4" />
+                <span>{listing.house_type_display || "PROPERTY"}</span>
+                {isLocationVerified && <span className="bg-emerald-500/20 text-emerald-300 text-[10px] px-2 py-0.5 rounded-full">VERIFIED LOCATION</span>}
               </div>
-            )}
-          </div>
 
-          {/* Image Swiper Modal */}
-          {swiperOpen && hasImages && (
-            <ImageSwiper
-              images={listing.images.map((img) => ({
-                ...img,
-                url: getOptimizedImageUrl(img.url, 1200, 900),
-              }))}
-              onClose={() => setSwiperOpen(false)}
-            />
-          )}
-
-          {/* Listing Details */}
-          <div className="bg-black/30 backdrop-blur-sm rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
-            <SafetyTip page="detail" className="mb-4" />
-
-            {/* Title & Status */}
-            <div className="flex justify-between items-start mb-4">
-              <h1 className="text-xl sm:text-2xl font-bold text-white">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white drop-shadow-md">
                 {listing.title}
               </h1>
-              <div className="flex flex-col items-end gap-1">
-                {listing.is_taken && <span className="badge-red">Taken</span>}
-                {isExpired && <span className="badge-red">Expired</span>}
-                {!isExpired && !listing.is_taken && (
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full border ${
-                      expiryStatus === "active"
-                        ? "border-green-500/30 text-green-400 bg-green-500/10"
-                        : expiryStatus === "needs_confirmation"
-                          ? "border-yellow-500/30 text-yellow-400 bg-yellow-500/10"
-                          : "border-orange-500/30 text-orange-400 bg-orange-500/10"
-                    }`}
-                  >
-                    {expiryStatusText}
-                  </span>
-                )}
-                {!isExpired &&
-                  !listing.is_taken &&
-                  daysRemaining !== undefined && (
-                    <span className="text-[10px] text-gray-500">
-                      {daysRemaining} days remaining
-                    </span>
-                  )}
-              </div>
-            </div>
 
-            {/* Location */}
-            <div className="flex items-center gap-2 text-gray-400 text-sm mb-4">
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              <span>{listing.location}</span>
-              {isLocationVerified && (
-                <span className="text-[10px] text-green-400 ml-1">
-                  ✅ Verified
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-gray-300 text-sm">
+                <span>📍 {listing.location}</span>
+                <span>•</span>
+                <span>Posted by <strong className="text-white">{author.name || "Owner"}</strong></span>
+              </div>
+
+              {/* Price & Badge Banner */}
+              <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-3">
+                <span className="text-3xl sm:text-4xl font-extrabold text-emerald-400">
+                  KSh {listing.price?.toLocaleString()}
+                  <span className="text-xs font-normal text-gray-400"> / mo</span>
                 </span>
-              )}
-            </div>
 
-            {/* Author Credibility Badge */}
-            {author.id && (
-              <div className="mb-4 p-3 bg-black/30 rounded-xl border border-white/5">
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <p className="text-xs text-gray-500">Posted by</p>
-                    <p className="font-medium text-white">{author.name}</p>
-                  </div>
-                  <CredibilityBadge
-                    userId={author.id}
-                    score={author.credibility_score}
-                    badge={author.badge}
-                    isVerified={author.is_verified}
-                  />
-                </div>
+                {listing.is_taken && <span className="bg-red-500/20 border border-red-500/30 text-red-400 text-xs px-2.5 py-1 rounded-full font-semibold">TAKEN</span>}
+                {isExpired && <span className="bg-gray-500/20 border border-gray-500/30 text-gray-400 text-xs px-2.5 py-1 rounded-full font-semibold">EXPIRED</span>}
               </div>
-            )}
-
-            {/* Price & True Monthly Cost */}
-            <div className="mb-4">
-              <p className="text-2xl sm:text-3xl font-bold text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text">
-                KSh {listing.price?.toLocaleString()}
-                {listing.price && (
-                  <span className="text-sm font-normal text-gray-500">
-                    {" "}
-                    / month
-                  </span>
-                )}
-              </p>
-              {listing.true_monthly_cost &&
-                listing.true_monthly_cost !== listing.price && (
-                  <p className="text-xs text-gray-400 mt-1">
-                     Total monthly: KSh{" "}
-                    {listing.true_monthly_cost.toLocaleString()}
-                    (incl. service charge)
-                  </p>
-                )}
             </div>
+          </div>
 
-            {/* Description */}
-            {listing.description && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-300 mb-2">
-                  Description
-                </h3>
-                <p className="text-gray-400 text-sm whitespace-pre-wrap">
-                  {listing.description}
-                </p>
-              </div>
-            )}
+          {/* Gallery Media Strip (Spotify Track Playlist Style) */}
+          {hasImages && listing.images.length > 1 && (
+            <div className="mt-6 flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none">
+              {listing.images.map((img, idx) => (
+                <button
+                  key={img.id || idx}
+                  onClick={() => openImageSwiper(idx)}
+                  className={`relative flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border-2 transition-all duration-300 ${
+                    selectedImageIndex === idx ? "border-emerald-500 scale-105 shadow-lg shadow-emerald-500/20" : "border-white/10 opacity-70 hover:opacity-100"
+                  }`}
+                >
+                  <img src={getThumbnailUrl(img.url)} alt={`Media ${idx}`} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-8 py-8 space-y-8">
+        
+        {/* Floating Controls Bar (Spotify Action Bar) */}
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-[#181818] rounded-2xl border border-white/5 shadow-xl">
+          <div className="flex items-center gap-3">
+            {/* Play/Contact CTA Button */}
+            <button
+              onClick={() => setShowContact(!showContact)}
+              className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-6 py-3 rounded-full flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:scale-105 transition transform"
+            >
+              <span>📞</span>
+              <span>{showContact ? "Hide Contact" : "Contact Owner"}</span>
+            </button>
 
             {/* Favorite Button */}
-            {isLoggedIn ? (
-              <button
-                onClick={toggleFavorite}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition mb-4 ${
-                  isFavorited
-                    ? "bg-red-500/20 text-red-400 border border-red-500/20 hover:bg-red-500/30"
-                    : "bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
-                }`}
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill={isFavorited ? "currentColor" : "none"}
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                  />
-                </svg>
-                {isFavorited ? "❤️ Saved" : "🤍 Save"}
-              </button>
-            ) : (
-              <Link to="/login" className="inline-block mb-4">
-                <button className="flex items-center gap-2 px-4 py-2 rounded-xl transition bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                    />
-                  </svg>
-                  Login to Save
-                </button>
-              </Link>
-            )}
-
-            {/* ============ LAYER 1: UTILITY & FEES ============ */}
-            {(listing.service_charge > 0 || listing.trash_fee > 0) && (
-              <div className="border-t border-white/10 pt-4 mb-4">
-                <h3 className="text-sm font-semibold text-gray-300 mb-2">
-                   Fees & Charges
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {listing.service_charge > 0 && (
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-500">
-                        Service Charge
-                      </p>
-                      <p className="font-medium text-white text-sm">
-                        KSh {listing.service_charge.toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-                  {listing.trash_fee > 0 && (
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-500">Trash Fee</p>
-                      <p className="font-medium text-white text-sm">
-                        KSh {listing.trash_fee.toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ============ LAYER 1: WATER MATRIX ============ */}
-            {(listing.water_source ||
-              listing.water_metering ||
-              listing.water_rationing) && (
-              <div className="border-t border-white/10 pt-4 mb-4">
-                <h3 className="text-sm font-semibold text-gray-300 mb-2">
-                  💧 Water Information
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {listing.water_source && (
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-500">Source</p>
-                      <p className="font-medium text-white text-sm">
-                        {listing.water_source_display}
-                      </p>
-                    </div>
-                  )}
-                  {listing.water_metering && (
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-500">Metering</p>
-                      <p className="font-medium text-white text-sm">
-                        {listing.water_metering_display}
-                      </p>
-                    </div>
-                  )}
-                  {listing.water_rationing &&
-                    listing.water_rationing !== "none" && (
-                      <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                        <p className="text-[10px] text-gray-500">Rationing</p>
-                        <p className="font-medium text-white text-sm">
-                          {listing.water_rationing_display}
-                        </p>
-                      </div>
-                    )}
-                </div>
-              </div>
-            )}
-
-            {/* ============ LAYER 1: POWER MATRIX ============ */}
-            {(listing.power_metering || listing.backup_power) && (
-              <div className="border-t border-white/10 pt-4 mb-4">
-                <h3 className="text-sm font-semibold text-gray-300 mb-2">
-                  ⚡ Power Information
-                </h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {listing.power_metering && (
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-500">Metering</p>
-                      <p className="font-medium text-white text-sm">
-                        {listing.power_metering_display}
-                      </p>
-                    </div>
-                  )}
-                  {listing.backup_power && (
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-500">Backup Power</p>
-                      <p className="font-medium text-white text-sm">
-                        {listing.backup_power_display}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ============ LAYER 1: BUILDING FEATURES ============ */}
-            {(listing.has_lift ||
-              listing.has_cctv ||
-              listing.has_balcony ||
-              listing.has_rooftop ||
-              listing.has_parking ||
-              listing.has_fence) && (
-              <div className="border-t border-white/10 pt-4 mb-4">
-                <h3 className="text-sm font-semibold text-gray-300 mb-2">
-                   Building Features
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {renderFeature("Elevator/Lift", listing.has_lift)}
-                  {renderFeature("CCTV", listing.has_cctv)}
-                  {renderFeature("Balcony", listing.has_balcony)}
-                  {renderFeature("Rooftop Access", listing.has_rooftop)}
-                  {renderFeature("Dedicated Parking", listing.has_parking)}
-                  {renderFeature("Perimeter Fence", listing.has_fence)}
-                </div>
-              </div>
-            )}
-
-            {/* ============ LAYER 1: COMMUTE & LOGISTICS ============ */}
-            {(listing.matatu_distance ||
-              listing.matatu_walk_time ||
-              listing.fare_cbd_offpeak ||
-              listing.fare_cbd_peak ||
-              listing.supermarket_distance ||
-              listing.gym_distance) && (
-              <div className="border-t border-white/10 pt-4 mb-4">
-                <h3 className="text-sm font-semibold text-gray-300 mb-2">
-                   Commute & Logistics
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {listing.matatu_distance && (
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-500">
-                        Matatu Distance
-                      </p>
-                      <p className="font-medium text-white text-sm">
-                        {listing.matatu_distance}m
-                      </p>
-                    </div>
-                  )}
-                  {listing.matatu_walk_time && (
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-500">Walk Time</p>
-                      <p className="font-medium text-white text-sm">
-                        {listing.matatu_walk_time} min
-                      </p>
-                    </div>
-                  )}
-                  {listing.fare_cbd_offpeak && (
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-500">
-                        Fare to CBD (Off-peak)
-                      </p>
-                      <p className="font-medium text-white text-sm">
-                        KSh {listing.fare_cbd_offpeak}
-                      </p>
-                    </div>
-                  )}
-                  {listing.fare_cbd_peak && (
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-500">
-                        Fare to CBD (Peak)
-                      </p>
-                      <p className="font-medium text-white text-sm">
-                        KSh {listing.fare_cbd_peak}
-                      </p>
-                    </div>
-                  )}
-                  {listing.supermarket_distance && (
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-500">Supermarket</p>
-                      <p className="font-medium text-white text-sm">
-                        {listing.supermarket_distance}m
-                      </p>
-                    </div>
-                  )}
-                  {listing.gym_distance && (
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-500">Gym</p>
-                      <p className="font-medium text-white text-sm">
-                        {listing.gym_distance}m
-                      </p>
-                    </div>
-                  )}
-                </div>
-                {listing.food_delivery_available && (
-                  <p className="text-xs text-green-400 mt-2">
-                    ✅ Food delivery available (Bolt/Uber Eats)
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* ============ MAP DISPLAY ============ */}
-            {hasLocation && (
-              <div className="border-t border-white/10 pt-4 mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-gray-300">
-                    📍 Property Location
-                    {isLocationVerified && (
-                      <span className="text-[10px] text-green-400 ml-2">
-                        ✅ Verified
-                      </span>
-                    )}
-                  </h3>
-                  <button
-                    onClick={() => setIsMapFullScreen(true)}
-                    className="text-xs text-blue-400 hover:text-blue-300 transition flex items-center gap-1"
-                  >
-                    <ArrowsPointingOutIcon className="w-4 h-4" />
-                    Full Screen
-                  </button>
-                </div>
-                <div className="rounded-xl overflow-hidden border border-white/10 h-[250px] cursor-pointer relative group">
-                  <div
-                    className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition z-10 flex items-center justify-center"
-                    onClick={() => setIsMapFullScreen(true)}
-                  >
-                    <span className="opacity-0 group-hover:opacity-100 text-white text-sm bg-black/50 px-4 py-2 rounded-full transition">
-                      🗺️ Tap to expand
-                    </span>
-                  </div>
-                  <MapContainer
-                    center={[mapLocation.lat, mapLocation.lng]}
-                    zoom={15}
-                    style={{ height: "100%", width: "100%" }}
-                    zoomControl={true}
-                    attributionControl={true}
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <Marker
-                      position={[mapLocation.lat, mapLocation.lng]}
-                      icon={isLocationVerified ? verifiedPinIcon : defaultIcon}
-                    >
-                      <Popup>
-                        <div className="text-sm">
-                          <p className="font-semibold">{listing.title}</p>
-                          <p className="text-gray-500 text-xs">
-                            {listing.location}
-                          </p>
-                          {isLocationVerified && (
-                            <p className="text-green-400 text-xs mt-1">
-                              ✅ Location Verified
-                            </p>
-                          )}
-                        </div>
-                      </Popup>
-                    </Marker>
-                    <Circle
-                      center={[mapLocation.lat, mapLocation.lng]}
-                      radius={500}
-                      pathOptions={{
-                        color: isLocationVerified ? "green" : "blue",
-                        fillOpacity: 0.1,
-                      }}
-                    />
-                  </MapContainer>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <span className="text-[10px] text-gray-500">
-                    📍{" "}
-                    {mapLocation.source === "pin"
-                      ? "Pin location"
-                      : "GPS location"}
-                  </span>
-                  {listing.matatu_distance && (
-                    <span className="text-[10px] text-gray-500">
-                      🚌 Matatu: {listing.matatu_distance}m
-                    </span>
-                  )}
-                  {listing.supermarket_distance && (
-                    <span className="text-[10px] text-gray-500">
-                      🛒 Supermarket: {listing.supermarket_distance}m
-                    </span>
-                  )}
-                  {listing.gym_distance && (
-                    <span className="text-[10px] text-gray-500">
-                       Gym: {listing.gym_distance}m
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Property Details (Basic) */}
-            <div className="border-t border-white/10 pt-4 mb-6">
-              <h3 className="text-sm font-semibold text-gray-300 mb-3">
-                Property Details
-              </h3>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Property Type</p>
-                  <p className="font-medium text-white text-sm">
-                    {listing.house_type_display}
-                  </p>
-                </div>
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Posted By</p>
-                  <p className="font-medium text-white text-sm">
-                    {listing.author?.name}
-                  </p>
-                </div>
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Posted On</p>
-                  <p className="font-medium text-white text-sm">
-                    {new Date(listing.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="bg-black/50 border border-white/5 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500">Status</p>
-                  <p
-                    className={`font-medium text-sm ${listing.is_taken ? "text-red-400" : "text-green-400"}`}
-                  >
-                    {listing.is_taken ? "Taken" : "Available"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Contact Section with WhatsApp */}
-            <div className="border-t border-white/10 pt-6">
-              <SafetyTip page="contact" className="mb-4" />
-
-              {!showContact ? (
-                <button
-                  onClick={handleContactClick}
-                  className="w-full btn-primary"
-                >
-                  📞 Reveal Contact Number
-                </button>
+            <button
+              onClick={toggleFavorite}
+              className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white transition hover:scale-105"
+              title="Save to Favorites"
+            >
+              {isFavorited ? (
+                <HeartSolidIcon className="w-6 h-6 text-red-500" />
               ) : (
-                <div className="space-y-3">
-                  <div className="bg-black/50 border border-white/10 rounded-xl p-4 text-center">
-                    <p className="text-sm text-gray-400 mb-2">Contact Seller</p>
-                    <div className="flex items-center justify-center gap-3">
-                      <a
-                        href={`tel:${listing.contact_phone}`}
-                        className="text-blue-400 font-semibold text-lg hover:text-blue-300 transition"
-                      >
-                        {listing.contact_phone}
-                      </a>
-                      <button
-                        onClick={handleCopyPhone}
-                        className="text-gray-400 hover:text-white transition"
-                        title="Copy to clipboard"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-gray-500 mt-2">
-                      Click to call or copy the number
-                    </p>
-                  </div>
-
-                  {/* WhatsApp Button */}
-                  <WhatsAppButton
-                    listingId={listing.id}
-                    userPhone={listing.contact_phone}
-                    listingTitle={listing.title}
-                    listingPrice={listing.price}
-                  />
-
-                  <SafetyTip page="whatsapp" className="mt-3" />
-                </div>
+                <HeartIcon className="w-6 h-6 text-gray-300" />
               )}
-            </div>
+            </button>
 
-            {/* ============ Review Section ============ */}
-            <div className="mt-6 border-t border-white/10 pt-6">
-              {liveReviewViewers.length > 0 && (
-                <div className="mb-3">
-                  <span className="text-[11px] rounded-full border border-yellow-400/20 bg-yellow-500/10 px-2 py-1 text-yellow-300">
-                     {liveReviewViewers.length} live review viewer
-                    {liveReviewViewers.length === 1 ? "" : "s"}
-                  </span>
-                </div>
-              )}
-              <ReviewSection
-                listingId={listing.id}
-                listingTitle={listing.title}
-                reviews={reviewsData}
-                isLoading={reviewsLoading}
-                isLoggedIn={isLoggedIn}
-                userId={user?.id}
-                onReviewSubmitted={handleReviewSubmitted}
+            {/* Share Button */}
+            <button
+              onClick={handleShare}
+              className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition hover:scale-105"
+              title="Share Listing"
+            >
+              <ShareIcon className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Author Credibility */}
+          {author.id && (
+            <div className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-xl border border-white/5">
+              <span className="text-xs text-gray-400">Listed by <strong className="text-white">{author.name}</strong></span>
+              <CredibilityBadge
+                userId={author.id}
+                score={author.credibility_score}
+                badge={author.badge}
+                isVerified={author.is_verified}
               />
             </div>
+          )}
+        </div>
 
-            {/* Comments Section */}
-            <div className="bg-black/30 backdrop-blur-sm rounded-2xl border border-white/10 p-4 sm:p-6 mt-6">
-              <h3 className="text-lg font-semibold text-white mb-4">
-                 Comments
-                {commentsData && (
-                  <span className="text-sm text-gray-500 ml-2">
-                    ({commentsData.total})
-                  </span>
+        {/* Revealed Contact Card */}
+        {showContact && (
+          <div className="p-6 bg-[#181818] border border-emerald-500/30 rounded-2xl shadow-2xl animate-fadeIn space-y-4">
+            <SafetyTip page="contact" className="mb-2" />
+            <div className="text-center space-y-2">
+              <p className="text-sm text-gray-400">Direct Contact Number</p>
+              <div className="flex items-center justify-center gap-3">
+                <a href={`tel:${listing.contact_phone}`} className="text-2xl font-bold text-emerald-400 hover:underline">
+                  {listing.contact_phone}
+                </a>
+                <button onClick={handleCopyPhone} className="text-gray-400 hover:text-white transition">📋</button>
+              </div>
+            </div>
+            <WhatsAppButton
+              listingId={listing.id}
+              userPhone={listing.contact_phone}
+              listingTitle={listing.title}
+              listingPrice={listing.price}
+            />
+          </div>
+        )}
+
+        {/* Overview & Description Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="md:col-span-2 space-y-6">
+            <div className="p-6 bg-[#181818] rounded-2xl border border-white/5 space-y-4">
+              <h2 className="text-xl font-bold text-white">About Listing</h2>
+              <p className="text-gray-300 leading-relaxed whitespace-pre-wrap text-sm sm:text-base">
+                {listing.description || "No description provided."}
+              </p>
+            </div>
+
+            {/* Building Features & Utilities */}
+            <div className="p-6 bg-[#181818] rounded-2xl border border-white/5 space-y-4">
+              <h3 className="text-lg font-bold text-white">Amenities & Features</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <FeatureCard label="Elevator / Lift" value={listing.has_lift} />
+                <FeatureCard label="CCTV Security" value={listing.has_cctv} />
+                <FeatureCard label="Private Balcony" value={listing.has_balcony} />
+                <FeatureCard label="Rooftop Access" value={listing.has_rooftop} />
+                <FeatureCard label="Dedicated Parking" value={listing.has_parking} />
+                <FeatureCard label="Perimeter Fence" value={listing.has_fence} />
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing & Logistics Summary Sidebar */}
+          <div className="space-y-6">
+            <div className="p-6 bg-[#181818] rounded-2xl border border-white/5 space-y-4">
+              <h3 className="text-lg font-bold text-white">Cost Breakdown</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between border-b border-white/5 pb-2">
+                  <span className="text-gray-400">Base Rent</span>
+                  <span className="font-semibold text-white">KSh {listing.price?.toLocaleString()}</span>
+                </div>
+                {listing.service_charge > 0 && (
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span className="text-gray-400">Service Charge</span>
+                    <span className="font-semibold text-white">KSh {listing.service_charge?.toLocaleString()}</span>
+                  </div>
                 )}
-              </h3>
-              {liveCommentViewers.length > 0 && (
-                <div className="mb-4">
-                  <span className="text-[11px] rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2 py-1 text-cyan-300">
-                    ⚡ {liveCommentViewers.length} live viewer
-                    {liveCommentViewers.length === 1 ? "" : "s"}
-                  </span>
-                </div>
-              )}
-
-              {/* Comment Input */}
-              {isLoggedIn ? (
-                <form
-                  onSubmit={handleCommentSubmit}
-                  className="flex gap-3 mb-6"
-                >
-                  <input
-                    type="text"
-                    value={commentContent}
-                    onChange={(e) => setCommentContent(e.target.value)}
-                    placeholder="Write a comment..."
-                    className="flex-1 input"
-                    disabled={isCommenting}
-                  />
-                  <button
-                    type="submit"
-                    disabled={isCommenting || !commentContent.trim()}
-                    className="btn-primary px-6 disabled:opacity-50"
-                  >
-                    {isCommenting ? "Posting..." : "💬 Post"}
-                  </button>
-                </form>
-              ) : (
-                <div className="bg-black/50 border border-white/10 rounded-xl p-4 mb-6 text-center">
-                  <p className="text-gray-400 text-sm mb-2">
-                    Want to join the conversation?
-                  </p>
-                  <div className="flex justify-center gap-3">
-                    <Link to="/login" className="btn-primary text-sm">
-                      Login
-                    </Link>
-                    <Link to="/register" className="btn-outline text-sm">
-                      Register
-                    </Link>
+                {listing.trash_fee > 0 && (
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span className="text-gray-400">Trash Fee</span>
+                    <span className="font-semibold text-white">KSh {listing.trash_fee?.toLocaleString()}</span>
                   </div>
-                  <p className="text-[10px] text-gray-500 mt-2">
-                    Login or register to comment on this listing
-                  </p>
-                </div>
-              )}
-
-              {/* Comments List */}
-              <div className="space-y-4">
-                {commentsLoading ? (
-                  <div className="flex justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                )}
+                {listing.true_monthly_cost && (
+                  <div className="flex justify-between pt-1 text-emerald-400 font-bold">
+                    <span>True Monthly Cost</span>
+                    <span>KSh {listing.true_monthly_cost?.toLocaleString()}</span>
                   </div>
-                ) : commentsData?.comments?.length > 0 ? (
-                  commentsData.comments.map((comment) => (
-                    <CommentItem
-                      key={comment.id}
-                      comment={comment}
-                      listingId={id}
-                      onReply={refetchComments}
-                    />
-                  ))
-                ) : (
-                  <p className="text-gray-500 text-center py-4 text-sm">
-                    No comments yet. Be the first to comment!
-                  </p>
                 )}
               </div>
             </div>
           </div>
         </div>
-      </SimpleAmbientBackground>
 
-      {/* Full Screen Map Modal (Safe Render) */}
+        {/* Map Section */}
+        {hasLocation && (
+          <div className="p-6 bg-[#181818] rounded-2xl border border-white/5 space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold text-white">Location Overview</h3>
+              <button
+                onClick={() => setIsMapFullScreen(true)}
+                className="text-xs text-emerald-400 hover:underline flex items-center gap-1"
+              >
+                <ArrowsPointingOutIcon className="w-4 h-4" /> Full Screen
+              </button>
+            </div>
+            <div className="h-64 rounded-xl overflow-hidden border border-white/10 relative">
+              <MapContainer center={[mapLocation.lat, mapLocation.lng]} zoom={15} className="h-full w-full">
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <Marker position={[mapLocation.lat, mapLocation.lng]} icon={isLocationVerified ? verifiedPinIcon : L.Icon.Default} />
+                <Circle center={[mapLocation.lat, mapLocation.lng]} radius={400} pathOptions={{ color: "#10b981", fillOpacity: 0.15 }} />
+              </MapContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Reviews Section */}
+        <div className="p-6 bg-[#181818] rounded-2xl border border-white/5">
+          <ReviewSection
+            listingId={listing.id}
+            listingTitle={listing.title}
+            reviews={reviewsData}
+            isLoading={reviewsLoading}
+            isLoggedIn={isLoggedIn}
+            userId={user?.id}
+            onReviewSubmitted={() => {
+              refetchReviews();
+              refetchListing();
+            }}
+          />
+        </div>
+
+        {/* Comments Section */}
+        <div className="p-6 bg-[#181818] rounded-2xl border border-white/5 space-y-6">
+          <h3 className="text-lg font-bold text-white">Community Discussion</h3>
+          {isLoggedIn ? (
+            <form onSubmit={handleCommentSubmit} className="flex gap-3">
+              <input
+                type="text"
+                value={commentContent}
+                onChange={(e) => setCommentContent(e.target.value)}
+                placeholder="Write a comment..."
+                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+              />
+              <button type="submit" disabled={isCommenting} className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-5 py-2.5 rounded-xl text-sm transition">
+                Post
+              </button>
+            </form>
+          ) : (
+            <p className="text-xs text-gray-400">Please <Link to="/login" className="text-emerald-400 underline">login</Link> to participate in the conversation.</p>
+          )}
+
+          <div className="space-y-4">
+            {commentsData?.comments?.map((comment) => (
+              <CommentItem key={comment.id} comment={comment} listingId={id} onReply={refetchComments} />
+            ))}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Fullscreen Gallery Swiper */}
+      {swiperOpen && hasImages && (
+        <ImageSwiper
+          images={listing.images.map((img) => ({ ...img, url: getOptimizedImageUrl(img.url, 1200, 900) }))}
+          onClose={() => setSwiperOpen(false)}
+        />
+      )}
+
+      {/* Full Screen Map */}
       {hasLocation && (
         <FullScreenMap
           isOpen={isMapFullScreen}
@@ -1127,13 +541,19 @@ export default function ListingDetailPage() {
           location={mapLocation}
           title={listing.title}
           isVerified={isLocationVerified}
-          nearbyAmenities={{
-            matatu_distance: listing.matatu_distance,
-            supermarket_distance: listing.supermarket_distance,
-            gym_distance: listing.gym_distance,
-          }}
         />
       )}
-    </>
+    </div>
+  );
+}
+
+// Sub-component for features
+function FeatureCard({ label, value }) {
+  if (value === undefined || value === null) return null;
+  return (
+    <div className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-medium ${value ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" : "bg-white/5 border-white/5 text-gray-500"}`}>
+      <span>{value ? "✓" : "✕"}</span>
+      <span>{label}</span>
+    </div>
   );
 }
