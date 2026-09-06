@@ -1,6 +1,6 @@
 // src/components/ListingStoriesModal.jsx
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon, HeartIcon, ShareIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
@@ -26,6 +26,7 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
   const STORY_DURATION = 5000;
 
   const currentListing = listings[currentListingIndex] || null;
+  const listingId = currentListing?.id || currentListing?._id;
 
   // Normalizing image extraction to ensure it never renders empty
   const getListingImages = (item) => {
@@ -55,16 +56,16 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
 
   useEffect(() => {
     const checkFavorite = async () => {
-      if (!currentListing?.id || !isLoggedIn) return;
+      if (!listingId || !isLoggedIn) return;
       try {
-        const { data } = await API.get(`/favorites/check/${currentListing.id}`);
+        const { data } = await API.get(`/favorites/check/${listingId}`);
         setIsFavorited(data.is_favorited);
       } catch (err) {
         // silent catch
       }
     };
     checkFavorite();
-  }, [currentListing?.id, isLoggedIn]);
+  }, [listingId, isLoggedIn]);
 
   useEffect(() => {
     if (!isOpen || isPaused) return;
@@ -121,15 +122,28 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
     }
   };
 
+  const handleViewDetails = (e) => {
+    e.stopPropagation();
+    if (!listingId) {
+      toast.error("Invalid listing identifier");
+      return;
+    }
+    onClose();
+    navigate(`/listings/${listingId}`);
+  };
+
   const toggleFavorite = async (e) => {
     e.stopPropagation();
     if (!isLoggedIn) {
       toast.error("Please login to save listings");
+      onClose();
       navigate("/login");
       return;
     }
+    if (!listingId) return;
+
     try {
-      const { data } = await API.post(`/favorites/listings/${currentListing.id}`);
+      const { data } = await API.post(`/favorites/listings/${listingId}`);
       setIsFavorited(data.is_favorited);
       toast.success(data.message || "Favorite updated");
     } catch (err) {
@@ -139,7 +153,9 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
 
   const handleShare = (e) => {
     e.stopPropagation();
-    const url = `${window.location.origin}/listings/${currentListing?.id}`;
+    if (!listingId) return;
+
+    const url = `${window.location.origin}/listings/${listingId}`;
     if (navigator.share) {
       navigator.share({
         title: currentListing?.title,
@@ -254,12 +270,13 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
           </div>
 
           <div className="flex items-center gap-3 pt-1">
-            <Link
-              to={`/listings/${currentListing.id}`}
-              className="flex-1 text-center py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition"
+            <button
+              type="button"
+              onClick={handleViewDetails}
+              className="flex-1 text-center py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition cursor-pointer"
             >
               View Full Details
-            </Link>
+            </button>
 
             <button
               onClick={toggleFavorite}
