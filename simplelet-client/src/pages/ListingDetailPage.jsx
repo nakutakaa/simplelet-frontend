@@ -12,10 +12,10 @@ import CredibilityBadge from "../components/CredibilityBadge";
 import SafetyTip from "../components/SafetyTip";
 import FullScreenMap from "../components/FullScreenMap";
 import { useRealTimeComments, useRealTimeReviews } from "../hooks";
-import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { ArrowsPointingOutIcon, HeartIcon, ShareIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { ArrowsPointingOutIcon, HeartIcon, ShareIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 
 // Leaflet default icon fix
@@ -27,7 +27,7 @@ L.Icon.Default.mergeOptions({
 });
 
 const verifiedPinIcon = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
@@ -41,14 +41,14 @@ const getErrorMessage = (error) => {
   const errorCode = data?.error_code || data?.error || "";
 
   const errorMap = {
-    listing_not_found: "❌ Listing not found.",
-    listing_expired: "⌛ This listing has expired.",
-    comment_failed: "❌ Failed to post comment.",
+    listing_not_found: "Listing not found.",
+    listing_expired: "This listing has expired.",
+    comment_failed: "Failed to post comment.",
   };
 
   if (errorCode && errorMap[errorCode]) return errorMap[errorCode];
-  if (status === 401) return "🔒 Please login to continue.";
-  return data?.message || data?.error || "❌ Something went wrong.";
+  if (status === 401) return "Please login to continue.";
+  return data?.message || data?.error || "Something went wrong.";
 };
 
 const getOptimizedImageUrl = (url, width = 1000, height = 750) => {
@@ -91,7 +91,7 @@ export default function ListingDetailPage() {
   const userId = user?.id || user?.user_id || null;
 
   const { comments: liveComments } = useRealTimeComments(id, userId);
-  const { viewers: liveReviewViewers, eventsCount: liveReviewEventsCount } = useRealTimeReviews(id, userId);
+  const { eventsCount: liveReviewEventsCount } = useRealTimeReviews(id, userId);
 
   useEffect(() => {
     const checkFavorite = async () => {
@@ -108,14 +108,14 @@ export default function ListingDetailPage() {
 
   const toggleFavorite = async () => {
     if (!isLoggedIn) {
-      toast.error("🔒 Please login to save listings");
+      toast.error("Please login to save listings");
       navigate("/login");
       return;
     }
     try {
       const { data } = await API.post(`/favorites/listings/${id}`);
       setIsFavorited(data.is_favorited);
-      toast.success(data.message || "Favorite updated!");
+      toast.success(data.message || "Favorite updated");
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -127,7 +127,7 @@ export default function ListingDetailPage() {
     retry: 1,
   });
 
-  const { data: commentsData, isLoading: commentsLoading, refetch: refetchComments } = useQuery({
+  const { data: commentsData, refetch: refetchComments } = useQuery({
     queryKey: ["comments", id],
     queryFn: () => fetchComments(id),
     enabled: !!id,
@@ -153,7 +153,7 @@ export default function ListingDetailPage() {
   const commentMutation = useMutation({
     mutationFn: postComment,
     onSuccess: () => {
-      toast.success("💬 Comment posted!");
+      toast.success("Comment posted");
       setCommentContent("");
       setIsCommenting(false);
       queryClient.invalidateQueries(["comments", id]);
@@ -174,14 +174,14 @@ export default function ListingDetailPage() {
       }).catch(() => {});
     } else {
       navigator.clipboard.writeText(window.location.href);
-      toast.success("🔗 Link copied to clipboard!");
+      toast.success("Link copied to clipboard");
     }
   };
 
   const handleCopyPhone = () => {
     if (listing?.contact_phone) {
       navigator.clipboard.writeText(listing.contact_phone);
-      toast.success("📋 Phone number copied!");
+      toast.success("Phone number copied");
     }
   };
 
@@ -220,7 +220,7 @@ export default function ListingDetailPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
       </div>
     );
   }
@@ -228,7 +228,7 @@ export default function ListingDetailPage() {
   if (error || !listing) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-400">{error ? getErrorMessage(error) : "❌ Listing not found"}</p>
+        <p className="text-red-400">{error ? getErrorMessage(error) : "Listing not found"}</p>
         <button onClick={() => navigate("/")} className="btn-primary mt-4">Back to Home</button>
       </div>
     );
@@ -242,12 +242,12 @@ export default function ListingDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#121212] text-white -mt-4 sm:-mt-8 -mx-3 sm:-mx-6 lg:-mx-8">
-      {/* Dynamic Spotify Ambient Hero Section */}
-      <div className="relative w-full bg-gradient-to-b from-emerald-900/40 via-[#121212]/90 to-[#121212] pt-8 pb-6 px-4 sm:px-8 overflow-hidden">
-        {/* Ambient Blur Layer derived from Cover Image */}
+      {/* Ambient Spotify-Style Hero Header */}
+      <div className="relative w-full bg-gradient-to-b from-blue-950/50 via-[#121212]/90 to-[#121212] pt-8 pb-6 px-4 sm:px-8 overflow-hidden">
+        {/* Dynamic Image Glow */}
         {mainCover && (
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-25 blur-3xl scale-125 pointer-events-none transition-all duration-700"
+            className="absolute inset-0 bg-cover bg-center opacity-20 blur-3xl scale-125 pointer-events-none transition-all duration-700"
             style={{ backgroundImage: `url(${mainCover})` }}
           />
         )}
@@ -255,10 +255,10 @@ export default function ListingDetailPage() {
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="flex flex-col md:flex-row items-center md:items-end gap-6 sm:gap-8">
             
-            {/* Spotify Album-Art Cover Preview Frame */}
+            {/* Focal Cover Image Card */}
             <div 
               onClick={() => hasImages && openImageSwiper(0)}
-              className="relative w-56 h-56 sm:w-64 sm:h-64 lg:w-72 lg:h-72 flex-shrink-0 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] cursor-pointer group border border-white/10"
+              className="relative w-56 h-56 sm:w-64 sm:h-64 lg:w-72 lg:h-72 flex-shrink-0 rounded-2xl overflow-hidden shadow-2xl cursor-pointer group border border-white/10"
             >
               {hasImages ? (
                 <img
@@ -267,49 +267,60 @@ export default function ListingDetailPage() {
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                 />
               ) : (
-                <div className="w-full h-full bg-[#282828] flex items-center justify-center text-gray-500">
+                <div className="w-full h-full bg-[#282828] flex items-center justify-center text-gray-400 text-sm">
                   No Image Available
                 </div>
               )}
-              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="bg-black/70 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full font-medium">
-                  🔍 View Gallery ({listing.images?.length || 0})
+                  View Gallery ({listing.images?.length || 0})
                 </span>
               </div>
             </div>
 
-            {/* Header Track Details */}
+            {/* Listing Title & Metadata Details */}
             <div className="flex-1 text-center md:text-left space-y-3">
-              <div className="flex items-center justify-center md:justify-start gap-2 text-xs font-bold tracking-wider uppercase text-emerald-400">
-                <SparklesIcon className="w-4 h-4" />
+              <div className="flex items-center justify-center md:justify-start gap-2 text-xs font-bold tracking-wider uppercase text-blue-400">
                 <span>{listing.house_type_display || "PROPERTY"}</span>
-                {isLocationVerified && <span className="bg-emerald-500/20 text-emerald-300 text-[10px] px-2 py-0.5 rounded-full">VERIFIED LOCATION</span>}
+                {isLocationVerified && (
+                  <span className="bg-blue-500/20 text-blue-300 text-[10px] px-2 py-0.5 rounded-full">
+                    VERIFIED LOCATION
+                  </span>
+                )}
               </div>
 
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white drop-shadow-md">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white">
                 {listing.title}
               </h1>
 
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-gray-300 text-sm">
-                <span>📍 {listing.location}</span>
+                <span>{listing.location}</span>
                 <span>•</span>
                 <span>Posted by <strong className="text-white">{author.name || "Owner"}</strong></span>
               </div>
 
-              {/* Price & Badge Banner */}
+              {/* Price Tag */}
               <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-3">
-                <span className="text-3xl sm:text-4xl font-extrabold text-emerald-400">
+                <span className="text-3xl sm:text-4xl font-extrabold text-blue-400">
                   KSh {listing.price?.toLocaleString()}
                   <span className="text-xs font-normal text-gray-400"> / mo</span>
                 </span>
 
-                {listing.is_taken && <span className="bg-red-500/20 border border-red-500/30 text-red-400 text-xs px-2.5 py-1 rounded-full font-semibold">TAKEN</span>}
-                {isExpired && <span className="bg-gray-500/20 border border-gray-500/30 text-gray-400 text-xs px-2.5 py-1 rounded-full font-semibold">EXPIRED</span>}
+                {listing.is_taken && (
+                  <span className="bg-red-500/20 border border-red-500/30 text-red-400 text-xs px-2.5 py-1 rounded-full font-semibold">
+                    TAKEN
+                  </span>
+                )}
+                {isExpired && (
+                  <span className="bg-gray-500/20 border border-gray-500/30 text-gray-400 text-xs px-2.5 py-1 rounded-full font-semibold">
+                    EXPIRED
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Gallery Media Strip (Spotify Track Playlist Style) */}
+          {/* Media Playlist Strip */}
           {hasImages && listing.images.length > 1 && (
             <div className="mt-6 flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none">
               {listing.images.map((img, idx) => (
@@ -317,10 +328,10 @@ export default function ListingDetailPage() {
                   key={img.id || idx}
                   onClick={() => openImageSwiper(idx)}
                   className={`relative flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border-2 transition-all duration-300 ${
-                    selectedImageIndex === idx ? "border-emerald-500 scale-105 shadow-lg shadow-emerald-500/20" : "border-white/10 opacity-70 hover:opacity-100"
+                    selectedImageIndex === idx ? "border-blue-500 scale-105 shadow-lg shadow-blue-500/20" : "border-white/10 opacity-70 hover:opacity-100"
                   }`}
                 >
-                  <img src={getThumbnailUrl(img.url)} alt={`Media ${idx}`} className="w-full h-full object-cover" />
+                  <img src={getThumbnailUrl(img.url)} alt={`Thumbnail ${idx}`} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -328,35 +339,34 @@ export default function ListingDetailPage() {
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Page Layout */}
       <div className="max-w-6xl mx-auto px-4 sm:px-8 py-8 space-y-8">
         
-        {/* Floating Controls Bar (Spotify Action Bar) */}
+        {/* Spotify-Style Control Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-[#181818] rounded-2xl border border-white/5 shadow-xl">
           <div className="flex items-center gap-3">
-            {/* Play/Contact CTA Button */}
+            {/* Primary Action Button */}
             <button
               onClick={() => setShowContact(!showContact)}
-              className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-6 py-3 rounded-full flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:scale-105 transition transform"
+              className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-full flex items-center gap-2 shadow-lg shadow-blue-600/20 hover:scale-105 transition transform"
             >
-              <span>📞</span>
               <span>{showContact ? "Hide Contact" : "Contact Owner"}</span>
             </button>
 
-            {/* Favorite Button */}
+            {/* Favorite Action */}
             <button
               onClick={toggleFavorite}
               className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white transition hover:scale-105"
               title="Save to Favorites"
             >
               {isFavorited ? (
-                <HeartSolidIcon className="w-6 h-6 text-red-500" />
+                <HeartSolidIcon className="w-6 h-6 text-blue-500" />
               ) : (
                 <HeartIcon className="w-6 h-6 text-gray-300" />
               )}
             </button>
 
-            {/* Share Button */}
+            {/* Share Action */}
             <button
               onClick={handleShare}
               className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition hover:scale-105"
@@ -366,7 +376,7 @@ export default function ListingDetailPage() {
             </button>
           </div>
 
-          {/* Author Credibility */}
+          {/* Author Badge */}
           {author.id && (
             <div className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-xl border border-white/5">
               <span className="text-xs text-gray-400">Listed by <strong className="text-white">{author.name}</strong></span>
@@ -380,17 +390,19 @@ export default function ListingDetailPage() {
           )}
         </div>
 
-        {/* Revealed Contact Card */}
+        {/* Revealed Contact Section */}
         {showContact && (
-          <div className="p-6 bg-[#181818] border border-emerald-500/30 rounded-2xl shadow-2xl animate-fadeIn space-y-4">
+          <div className="p-6 bg-[#181818] border border-blue-500/30 rounded-2xl shadow-2xl space-y-4">
             <SafetyTip page="contact" className="mb-2" />
             <div className="text-center space-y-2">
               <p className="text-sm text-gray-400">Direct Contact Number</p>
               <div className="flex items-center justify-center gap-3">
-                <a href={`tel:${listing.contact_phone}`} className="text-2xl font-bold text-emerald-400 hover:underline">
+                <a href={`tel:${listing.contact_phone}`} className="text-2xl font-bold text-blue-400 hover:underline">
                   {listing.contact_phone}
                 </a>
-                <button onClick={handleCopyPhone} className="text-gray-400 hover:text-white transition">📋</button>
+                <button onClick={handleCopyPhone} className="text-xs bg-white/10 hover:bg-white/20 text-white px-2.5 py-1 rounded-md transition">
+                  Copy
+                </button>
               </div>
             </div>
             <WhatsAppButton
@@ -402,7 +414,7 @@ export default function ListingDetailPage() {
           </div>
         )}
 
-        {/* Overview & Description Section */}
+        {/* Description & Overview Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-6">
             <div className="p-6 bg-[#181818] rounded-2xl border border-white/5 space-y-4">
@@ -412,7 +424,7 @@ export default function ListingDetailPage() {
               </p>
             </div>
 
-            {/* Building Features & Utilities */}
+            {/* Amenities Grid */}
             <div className="p-6 bg-[#181818] rounded-2xl border border-white/5 space-y-4">
               <h3 className="text-lg font-bold text-white">Amenities & Features</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -426,7 +438,7 @@ export default function ListingDetailPage() {
             </div>
           </div>
 
-          {/* Pricing & Logistics Summary Sidebar */}
+          {/* Pricing Breakdown Sidebar */}
           <div className="space-y-6">
             <div className="p-6 bg-[#181818] rounded-2xl border border-white/5 space-y-4">
               <h3 className="text-lg font-bold text-white">Cost Breakdown</h3>
@@ -448,7 +460,7 @@ export default function ListingDetailPage() {
                   </div>
                 )}
                 {listing.true_monthly_cost && (
-                  <div className="flex justify-between pt-1 text-emerald-400 font-bold">
+                  <div className="flex justify-between pt-1 text-blue-400 font-bold">
                     <span>True Monthly Cost</span>
                     <span>KSh {listing.true_monthly_cost?.toLocaleString()}</span>
                   </div>
@@ -458,14 +470,14 @@ export default function ListingDetailPage() {
           </div>
         </div>
 
-        {/* Map Section */}
+        {/* Map Location Section */}
         {hasLocation && (
           <div className="p-6 bg-[#181818] rounded-2xl border border-white/5 space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-bold text-white">Location Overview</h3>
               <button
                 onClick={() => setIsMapFullScreen(true)}
-                className="text-xs text-emerald-400 hover:underline flex items-center gap-1"
+                className="text-xs text-blue-400 hover:underline flex items-center gap-1"
               >
                 <ArrowsPointingOutIcon className="w-4 h-4" /> Full Screen
               </button>
@@ -474,13 +486,13 @@ export default function ListingDetailPage() {
               <MapContainer center={[mapLocation.lat, mapLocation.lng]} zoom={15} className="h-full w-full">
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <Marker position={[mapLocation.lat, mapLocation.lng]} icon={isLocationVerified ? verifiedPinIcon : L.Icon.Default} />
-                <Circle center={[mapLocation.lat, mapLocation.lng]} radius={400} pathOptions={{ color: "#10b981", fillOpacity: 0.15 }} />
+                <Circle center={[mapLocation.lat, mapLocation.lng]} radius={400} pathOptions={{ color: "#3B82F6", fillOpacity: 0.15 }} />
               </MapContainer>
             </div>
           </div>
         )}
 
-        {/* Reviews Section */}
+        {/* Reviews */}
         <div className="p-6 bg-[#181818] rounded-2xl border border-white/5">
           <ReviewSection
             listingId={listing.id}
@@ -496,7 +508,7 @@ export default function ListingDetailPage() {
           />
         </div>
 
-        {/* Comments Section */}
+        {/* Discussion & Comments */}
         <div className="p-6 bg-[#181818] rounded-2xl border border-white/5 space-y-6">
           <h3 className="text-lg font-bold text-white">Community Discussion</h3>
           {isLoggedIn ? (
@@ -506,14 +518,14 @@ export default function ListingDetailPage() {
                 value={commentContent}
                 onChange={(e) => setCommentContent(e.target.value)}
                 placeholder="Write a comment..."
-                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
               />
-              <button type="submit" disabled={isCommenting} className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-5 py-2.5 rounded-xl text-sm transition">
+              <button type="submit" disabled={isCommenting} className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition">
                 Post
               </button>
             </form>
           ) : (
-            <p className="text-xs text-gray-400">Please <Link to="/login" className="text-emerald-400 underline">login</Link> to participate in the conversation.</p>
+            <p className="text-xs text-gray-400">Please <Link to="/login" className="text-blue-400 underline">login</Link> to participate in the conversation.</p>
           )}
 
           <div className="space-y-4">
@@ -525,7 +537,7 @@ export default function ListingDetailPage() {
 
       </div>
 
-      {/* Fullscreen Gallery Swiper */}
+      {/* Fullscreen Swiper Lightbox */}
       {swiperOpen && hasImages && (
         <ImageSwiper
           images={listing.images.map((img) => ({ ...img, url: getOptimizedImageUrl(img.url, 1200, 900) }))}
@@ -533,7 +545,7 @@ export default function ListingDetailPage() {
         />
       )}
 
-      {/* Full Screen Map */}
+      {/* Full Screen Map Overlay */}
       {hasLocation && (
         <FullScreenMap
           isOpen={isMapFullScreen}
@@ -547,11 +559,11 @@ export default function ListingDetailPage() {
   );
 }
 
-// Sub-component for features
+// Sub-component for listing amenities
 function FeatureCard({ label, value }) {
   if (value === undefined || value === null) return null;
   return (
-    <div className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-medium ${value ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" : "bg-white/5 border-white/5 text-gray-500"}`}>
+    <div className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-medium ${value ? "bg-blue-500/10 border-blue-500/20 text-blue-300" : "bg-white/5 border-white/5 text-gray-500"}`}>
       <span>{value ? "✓" : "✕"}</span>
       <span>{label}</span>
     </div>
