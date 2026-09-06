@@ -7,7 +7,6 @@ import toast from "react-hot-toast";
 import API from "../services/api";
 import SafetyTip from "../components/SafetyTip";
 import PhonePromptModal from "../components/PhonePromptModal";
-import { EyeIcon, EyeSlashIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 
 const SECURITY_QUESTIONS = [
   { key: "mother_maiden_name", label: "What is your mother's maiden name?" },
@@ -28,6 +27,19 @@ const getErrorMessage = (error) => {
   return data?.message || data?.error || "Something went wrong. Please try again.";
 };
 
+const formatKenyanPhone = (input) => {
+  let cleaned = input.replace(/\D/g, "");
+  if (cleaned.startsWith("0")) {
+    cleaned = "254" + cleaned.slice(1);
+  } else if (cleaned.startsWith("7") || cleaned.startsWith("1")) {
+    cleaned = "254" + cleaned;
+  }
+  if (!cleaned.startsWith("+") && cleaned.length > 0) {
+    cleaned = "+" + cleaned;
+  }
+  return cleaned;
+};
+
 const registerUser = async (payload) => {
   const { data } = await API.post("/auth/register", payload);
   return data;
@@ -42,6 +54,7 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPhoneRegister, setShowPhoneRegister] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -52,10 +65,6 @@ export default function RegisterPage() {
     securityQuestionKey: "",
     securityAnswer: "",
   });
-
-  const isPhoneValid = /^\+254[0-9]{9}$/.test(formData.phone);
-  const isPasswordLengthValid = formData.password.length >= 6;
-  const doPasswordsMatch = formData.confirmPassword.length > 0 && formData.password === formData.confirmPassword;
 
   const googleAuthMutation = useMutation({
     mutationFn: verifyGoogleToken,
@@ -81,7 +90,7 @@ export default function RegisterPage() {
       setFieldErrors({});
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
-      toast.success("Account created successfully!");
+      toast.success("Account created successfully! Welcome to SimpleLet!");
       navigate("/");
     },
     onError: (error) => {
@@ -91,14 +100,6 @@ export default function RegisterPage() {
     },
   });
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (fieldErrors[name]) {
-      setFieldErrors((current) => ({ ...current, [name]: null }));
-    }
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -106,11 +107,11 @@ export default function RegisterPage() {
       setFieldErrors({ name: "Please enter your full name." });
       return;
     }
-    if (!isPhoneValid) {
-      setFieldErrors({ phone: "Format must be +254XXXXXXXXX (9 digits after +254)" });
+    if (!formData.phone.match(/^\+254[0-9]{9}$/)) {
+      setFieldErrors({ phone: "Format: +254XXXXXXXXX (9 digits after +254)" });
       return;
     }
-    if (!isPasswordLengthValid) {
+    if (formData.password.length < 6) {
       setFieldErrors({ password: "Password must be at least 6 characters." });
       return;
     }
@@ -129,236 +130,177 @@ export default function RegisterPage() {
     });
   };
 
+  const handleChange = (e) => {
+    let value = e.target.value;
+    if (e.target.name === "phone") {
+      value = formatKenyanPhone(value);
+    }
+    setFormData({ ...formData, [e.target.name]: value });
+    if (fieldErrors[e.target.name]) {
+      setFieldErrors((current) => ({ ...current, [e.target.name]: null }));
+    }
+  };
+
   return (
-    <div className="max-w-md mx-auto my-8 px-4">
-      <div className="bg-[#121212] rounded-2xl border border-white/10 p-6 sm:p-8 shadow-2xl">
-        <h2 className="text-2xl font-bold text-center mb-2 text-white">
-          Create an Account
-        </h2>
-        <p className="text-center text-gray-400 text-sm mb-6">
-          Join SimpleLet and start exploring properties
-        </p>
+    <div className="max-w-md mx-auto">
+      <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-6 sm:p-8 shadow-xl space-y-6">
+        <div className="text-center space-y-1">
+          <h2 className="text-2xl font-bold text-white">Create an Account</h2>
+          <p className="text-gray-400 text-sm">Join SimpleLet and start posting properties</p>
+        </div>
 
-        <SafetyTip page="register" className="mb-6" />
+        <SafetyTip page="register" />
 
-        <div className="mb-6">
+        {/* Hero Google Auth Option */}
+        <div className="bg-[#121212] p-4 rounded-xl border border-blue-500/30 text-center space-y-3">
+          <p className="text-xs text-blue-400 font-semibold uppercase tracking-wider">Fastest & Recommended</p>
           <div className="flex justify-center w-full">
             {googleAuthMutation.isPending ? (
-              <div className="py-2 text-sm text-gray-400 animate-pulse">
-                Authenticating with Google...
-              </div>
+              <div className="py-2 text-sm text-gray-400 animate-pulse">Authenticating with Google...</div>
             ) : (
               <GoogleLogin
                 onSuccess={(res) => res.credential && googleAuthMutation.mutate(res.credential)}
                 onError={() => toast.error("Google Sign-In failed or popup was closed.")}
-                theme="filled_black"
+                theme="filled_blue"
                 shape="pill"
                 width="100%"
               />
             )}
           </div>
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10"></div>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-[#121212] px-3 text-gray-400 font-medium">
-                Or register with phone
-              </span>
-            </div>
-          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Full Name */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">
-              Full Name
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="John Doe"
-              className={`w-full bg-black/40 border ${
-                fieldErrors.name ? "border-red-500/80" : "border-white/10 focus:border-blue-500"
-              } rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all`}
-              required
-            />
-            {fieldErrors.name && <p className="text-red-400 text-xs mt-1.5">{fieldErrors.name}</p>}
-          </div>
+        {/* Toggle Button for Phone Registration */}
+        {!showPhoneRegister ? (
+          <button
+            onClick={() => setShowPhoneRegister(true)}
+            className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white rounded-xl border border-white/10 text-xs font-medium transition"
+          >
+            Don't have a Google Account? Register with phone
+          </button>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4 pt-2 border-t border-white/10">
+            <div>
+              <label className="label">Full Name</label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="John Doe"
+                className="input focus:border-blue-500"
+                required
+              />
+              {fieldErrors.name && <p className="text-red-400 text-[10px] mt-1">{fieldErrors.name}</p>}
+            </div>
 
-          {/* Phone Number */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">
-              Phone Number
-            </label>
-            <div className="relative">
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="label">Phone Number</label>
+                {formData.phone && <span className="text-[10px] text-blue-400 font-mono">{formData.phone}</span>}
+              </div>
               <input
                 type="tel"
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                placeholder="+254712345678"
-                className={`w-full bg-black/40 border ${
-                  fieldErrors.phone
-                    ? "border-red-500/80"
-                    : isPhoneValid
-                    ? "border-blue-500/80 focus:border-blue-500"
-                    : "border-white/10 focus:border-blue-500"
-                } rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all`}
+                placeholder="0712345678 or +254712345678"
+                className="input focus:border-blue-500"
                 required
               />
-              {isPhoneValid && (
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <CheckCircleIcon className="w-5 h-5 text-blue-400" />
-                </div>
-              )}
+              {fieldErrors.phone && <p className="text-red-400 text-[10px] mt-1">{fieldErrors.phone}</p>}
             </div>
-            {fieldErrors.phone ? (
-              <p className="text-red-400 text-xs mt-1.5">{fieldErrors.phone}</p>
-            ) : (
-              <p className="text-[11px] text-gray-500 mt-1">Format: +254712345678</p>
-            )}
-          </div>
 
-          {/* Password */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="At least 6 characters"
-                className={`w-full bg-black/40 border ${
-                  fieldErrors.password ? "border-red-500/80" : "border-white/10 focus:border-blue-500"
-                } rounded-xl px-4 py-3 pr-10 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all`}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition"
-              >
-                {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-              </button>
-            </div>
-            {/* Real-time indicator bar */}
-            {formData.password.length > 0 && (
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-300 ${
-                      formData.password.length >= 8
-                        ? "w-full bg-blue-500"
-                        : formData.password.length >= 6
-                        ? "w-2/3 bg-blue-400"
-                        : "w-1/3 bg-blue-600/50"
-                    }`}
-                  />
-                </div>
-                <span className="text-[10px] text-gray-400">
-                  {formData.password.length >= 8 ? "Strong" : formData.password.length >= 6 ? "Good" : "Weak"}
-                </span>
+            <div>
+              <label className="label">Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="Create password (min 6 chars)"
+                  className="input pr-12 focus:border-blue-500"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-blue-400 hover:text-blue-300"
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
               </div>
-            )}
-            {fieldErrors.password && <p className="text-red-400 text-xs mt-1.5">{fieldErrors.password}</p>}
-          </div>
-
-          {/* Confirm Password */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">
-              Confirm Password
-            </label>
-            <div className="relative">
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="Re-enter password"
-                className={`w-full bg-black/40 border ${
-                  fieldErrors.confirmPassword
-                    ? "border-red-500/80"
-                    : doPasswordsMatch
-                    ? "border-blue-500/80"
-                    : "border-white/10 focus:border-blue-500"
-                } rounded-xl px-4 py-3 pr-10 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all`}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition"
-              >
-                {showConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-              </button>
+              {fieldErrors.password && <p className="text-red-400 text-[10px] mt-1">{fieldErrors.password}</p>}
             </div>
-            {doPasswordsMatch && (
-              <p className="text-blue-400 text-xs mt-1 flex items-center gap-1">
-                <CheckCircleIcon className="w-4 h-4" /> Passwords match
-              </p>
-            )}
-            {fieldErrors.confirmPassword && <p className="text-red-400 text-xs mt-1.5">{fieldErrors.confirmPassword}</p>}
-          </div>
 
-          {/* Security Question */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">
-              Security Question
-            </label>
-            <select
-              name="securityQuestionKey"
-              value={formData.securityQuestionKey}
-              onChange={handleChange}
-              className="w-full bg-[#181818] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 transition-all"
+            <div>
+              <label className="label">Confirm Password</label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  placeholder="Confirm password"
+                  className="input pr-12 focus:border-blue-500"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-blue-400 hover:text-blue-300"
+                >
+                  {showConfirmPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+              {fieldErrors.confirmPassword && <p className="text-red-400 text-[10px] mt-1">{fieldErrors.confirmPassword}</p>}
+            </div>
+
+            <div>
+              <label className="label">Security Question</label>
+              <select
+                name="securityQuestionKey"
+                value={formData.securityQuestionKey}
+                onChange={handleChange}
+                className="input focus:border-blue-500"
+              >
+                <option value="">Choose one question</option>
+                {SECURITY_QUESTIONS.map((q) => (
+                  <option key={q.key} value={q.key}>{q.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="label">Security Answer</label>
+              <input
+                type="text"
+                name="securityAnswer"
+                value={formData.securityAnswer}
+                onChange={handleChange}
+                placeholder="Your answer"
+                className="input focus:border-blue-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={registerMutation.isPending}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl text-sm transition"
             >
-              <option value="">Choose one question</option>
-              {SECURITY_QUESTIONS.map((q) => (
-                <option key={q.key} value={q.key}>{q.label}</option>
-              ))}
-            </select>
-          </div>
+              {registerMutation.isPending ? "Registering..." : "Create Account"}
+            </button>
+          </form>
+        )}
 
-          {/* Security Answer */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">
-              Security Answer
-            </label>
-            <input
-              type="text"
-              name="securityAnswer"
-              value={formData.securityAnswer}
-              onChange={handleChange}
-              placeholder="Your answer"
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-all"
-            />
-          </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={registerMutation.isPending}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800/50 text-white font-bold py-3.5 rounded-xl text-sm transition-all duration-200 shadow-lg shadow-blue-600/20"
-          >
-            {registerMutation.isPending ? "Creating Account..." : "Create Account"}
-          </button>
-
-          <div className="text-center pt-2">
-            <p className="text-sm text-gray-400">
-              Already have an account?{" "}
-              <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium underline">
-                Login here
-              </Link>
-            </p>
-          </div>
-        </form>
+        <div className="text-center pt-2">
+          <p className="text-sm text-gray-400">
+            Already have an account?{" "}
+            <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium">
+              Login here
+            </Link>
+          </p>
+        </div>
       </div>
 
       <PhonePromptModal
