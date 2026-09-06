@@ -1,5 +1,5 @@
 // src/pages/HomePage.jsx
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import API from "../services/api";
@@ -14,11 +14,11 @@ const HOUSE_TYPES = [
   { value: "bedsitter", label: "Bedsitter" },
   { value: "studio", label: "Studio" },
   { value: "single_room", label: "Single Room" },
-  { value: "1bed_bungalow", label: "1 Bedroom Bungalow" },
-  { value: "2bed_bungalow", label: "2 Bedroom Bungalow" },
-  { value: "1bed_apartment", label: "1 Bedroom Apartment" },
-  { value: "2bed_apartment", label: "2 Bedroom Apartment" },
-  { value: "3bed_apartment", label: "3 Bedroom Apartment" },
+  { value: "1bed_bungalow", label: "1 Bed Bungalow" },
+  { value: "2bed_bungalow", label: "2 Bed Bungalow" },
+  { value: "1bed_apartment", label: "1 Bed Apartment" },
+  { value: "2bed_apartment", label: "2 Bed Apartment" },
+  { value: "3bed_apartment", label: "3 Bed Apartment" },
   { value: "commercial", label: "Commercial Space" },
 ];
 
@@ -29,17 +29,6 @@ const SORT_OPTIONS = [
   { value: "distance", label: "Nearest First" },
 ];
 
-const PROPERTY_TYPE_SIMILARITY = {
-  studio: ["bedsitter", "single_room"],
-  bedsitter: ["studio", "single_room"],
-  single_room: ["studio", "bedsitter"],
-  "1bed_apartment": ["1bed_bungalow", "2bed_apartment"],
-  "1bed_bungalow": ["1bed_apartment", "2bed_bungalow"],
-  "2bed_apartment": ["1bed_apartment", "2bed_bungalow", "3bed_apartment"],
-  "2bed_bungalow": ["1bed_bungalow", "2bed_apartment"],
-  "3bed_apartment": ["2bed_apartment", "3bed_bungalow"],
-};
-
 const fetchListings = async (params) => {
   const { data } = await API.get("/listings", { params });
   return data;
@@ -49,10 +38,9 @@ export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchInputRef = useRef(null);
 
-  // Input state for text search box
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") || "");
 
-  // Form state for other inputs/filters
   const [filters, setFilters] = useState(() => ({
     house_type: searchParams.get("house_type") || "",
     location: searchParams.get("location") || "",
@@ -62,7 +50,6 @@ export default function HomePage() {
     nearby: searchParams.get("nearby") || "",
   }));
 
-  // Active filters that trigger the API call
   const [activeFilters, setActiveFilters] = useState(() => ({
     search: searchParams.get("search") || "",
     house_type: searchParams.get("house_type") || "",
@@ -80,16 +67,13 @@ export default function HomePage() {
   const currentUser = JSON.parse(localStorage.getItem("user") || "null");
   const userId = currentUser?.id || currentUser?.user_id || null;
 
-  // Real-time listings hook
   const { newListings = [] } = useRealTimeListings(null, userId, activeFilters);
 
-  // Query execution
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["listings", activeFilters],
     queryFn: () => fetchListings(activeFilters),
   });
 
-  // URL Sync Helper
   const updateURL = useCallback((paramsToUpdate) => {
     const params = new URLSearchParams();
     Object.entries(paramsToUpdate).forEach(([key, value]) => {
@@ -98,12 +82,8 @@ export default function HomePage() {
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
 
-  // Handle Search Submission (Button or Enter)
   const executeSearch = () => {
-    const newActive = {
-      ...filters,
-      search: searchInput,
-    };
+    const newActive = { ...filters, search: searchInput };
     setActiveFilters(newActive);
     updateURL(newActive);
   };
@@ -120,24 +100,18 @@ export default function HomePage() {
     }
   };
 
-  // Handle filter controls (Dropdowns, Inputs)
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     const updatedFilters = { ...filters, [name]: value };
     setFilters(updatedFilters);
 
-    // Dropdowns trigger search immediately using currently active search query
     if (name === "house_type" || name === "sort_by") {
-      const newActive = {
-        ...updatedFilters,
-        search: activeFilters.search,
-      };
+      const newActive = { ...updatedFilters, search: activeFilters.search };
       setActiveFilters(newActive);
       updateURL(newActive);
     }
   };
 
-  // Clear filters
   const clearFilters = () => {
     const reset = {
       search: "",
@@ -156,7 +130,6 @@ export default function HomePage() {
     updateURL(reset);
   };
 
-  // Location handling
   const getUserLocation = () => {
     setIsGettingLocation(true);
     if (navigator.geolocation) {
@@ -174,10 +147,7 @@ export default function HomePage() {
           };
           setFilters(updatedFilters);
 
-          const newActive = {
-            ...updatedFilters,
-            search: activeFilters.search,
-          };
+          const newActive = { ...updatedFilters, search: activeFilters.search };
           setActiveFilters(newActive);
           updateURL(newActive);
           toast.success("📍 Location found! Showing nearby listings.");
@@ -185,7 +155,7 @@ export default function HomePage() {
         },
         (error) => {
           console.error("Geolocation error:", error);
-          toast.error("Could not get your location. Please enable location services.");
+          toast.error("Could not get your location.");
           setIsGettingLocation(false);
         },
         { enableHighAccuracy: true, timeout: 10000 }
@@ -196,12 +166,6 @@ export default function HomePage() {
     }
   };
 
-  const getSimilarTypes = (type) => {
-    if (!type) return [];
-    return PROPERTY_TYPE_SIMILARITY[type] || [];
-  };
-
-  // Flatten and Deduplicate Listings
   const rawData = Array.isArray(data) ? data : data?.data || data?.listings || [];
   const allListings = [...newListings, ...rawData];
   const uniqueListingsMap = new Map();
@@ -240,7 +204,7 @@ export default function HomePage() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-400">Failed to load listings. Please try again.</p>
+        <p className="text-red-400 text-sm sm:text-base">Failed to load listings. Please try again.</p>
         <button onClick={() => refetch()} className="btn-primary mt-4 text-sm">
           Retry
         </button>
@@ -250,15 +214,15 @@ export default function HomePage() {
 
   return (
     <div
-      className="min-h-screen bg-cover bg-center bg-no-repeat bg-fixed space-y-4 sm:space-y-6 -mx-4 sm:-mx-6 lg:-mx-8 p-4 sm:p-6 lg:p-8"
+      className="min-h-screen bg-cover bg-center bg-no-repeat bg-fixed space-y-4 sm:space-y-6 rounded-2xl p-2 sm:p-6 lg:p-8"
       style={{
-        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.75)), url(${slateBg})`,
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.8)), url(${slateBg})`,
         backgroundAttachment: "fixed",
       }}
     >
       {newListings.length > 0 && (
         <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between backdrop-blur-sm">
-          <span className="text-sm text-emerald-300 flex items-center gap-2">
+          <span className="text-xs sm:text-sm text-emerald-300 flex items-center gap-2">
             <span className="animate-pulse">🔔</span>
             {newListings.length} new listing{newListings.length > 1 ? "s" : ""} matching your search!
           </span>
@@ -271,48 +235,45 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Search and Filter Bar */}
-      <div className="bg-black/90 backdrop-blur-md rounded-2xl border border-white/10 p-4 sm:p-6 shadow-xl">
-        <SafetyTip page="search" className="mb-4" />
+      {/* Search and Filter Panel */}
+      <div className="bg-black/90 backdrop-blur-md rounded-2xl border border-white/10 p-3 sm:p-6 shadow-xl">
+        <SafetyTip page="search" className="mb-3 sm:mb-4" />
 
         <form onSubmit={handleSearchSubmit} className="space-y-3 sm:space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <input
               ref={searchInputRef}
               type="text"
               name="search"
-              placeholder="Search properties..."
-              className="flex-1 input"
+              placeholder="Search properties, areas..."
+              className="flex-1 input text-sm"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={handleSearchKeyDown}
             />
-            <button type="submit" className="btn-primary w-full sm:w-auto">
-              <svg
-                className="w-4 h-4 sm:w-5 sm:h-5 inline mr-1.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div className="flex gap-2">
+              <button type="submit" className="btn-primary flex-1 sm:flex-none text-sm py-2 px-4">
+                Search
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
+                className="sm:hidden px-3 py-2 bg-white/10 text-xs text-gray-300 rounded-lg border border-white/10 flex items-center gap-1"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              Search
-            </button>
+                ⚙️ Filters {mobileFiltersOpen ? "▲" : "▼"}
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
+          {/* Filters Grid — Responsive Toggle for Small Screen Devices */}
+          <div className={`${mobileFiltersOpen ? "block" : "hidden sm:grid"} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 pt-2`}>
             <div>
-              <label className="label">Type</label>
+              <label className="label text-[11px] sm:text-xs">Type</label>
               <select
                 name="house_type"
                 value={filters.house_type}
                 onChange={handleFilterChange}
-                className="input"
+                className="input text-xs sm:text-sm"
               >
                 {HOUSE_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -323,48 +284,48 @@ export default function HomePage() {
             </div>
 
             <div>
-              <label className="label">Location</label>
+              <label className="label text-[11px] sm:text-xs">Location</label>
               <input
                 type="text"
                 name="location"
                 value={filters.location}
                 onChange={handleFilterChange}
                 placeholder="e.g., Kilimani"
-                className="input"
+                className="input text-xs sm:text-sm"
               />
             </div>
 
             <div>
-              <label className="label">Min Price</label>
+              <label className="label text-[11px] sm:text-xs">Min Price</label>
               <input
                 type="number"
                 name="price_min"
                 value={filters.price_min}
                 onChange={handleFilterChange}
                 placeholder="0"
-                className="input"
+                className="input text-xs sm:text-sm"
               />
             </div>
 
             <div>
-              <label className="label">Max Price</label>
+              <label className="label text-[11px] sm:text-xs">Max Price</label>
               <input
                 type="number"
                 name="price_max"
                 value={filters.price_max}
                 onChange={handleFilterChange}
-                placeholder="1000000"
-                className="input"
+                placeholder="100000"
+                className="input text-xs sm:text-sm"
               />
             </div>
 
-            <div>
-              <label className="label">Sort By</label>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="label text-[11px] sm:text-xs">Sort By</label>
               <select
                 name="sort_by"
                 value={filters.sort_by}
                 onChange={handleFilterChange}
-                className="input"
+                className="input text-xs sm:text-sm"
               >
                 {SORT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -375,10 +336,8 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* NEARBY SEARCH BUTTON */}
-          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-white/10">
-            <SafetyTip page="price" className="w-full mb-2" />
-
+          {/* Nearby Mode Bar */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/10">
             <button
               type="button"
               onClick={getUserLocation}
@@ -418,12 +377,6 @@ export default function HomePage() {
                 ✕ Turn off nearby
               </button>
             )}
-
-            {userLocation && showNearby && (
-              <span className="text-[10px] text-gray-500">
-                Showing listings near you
-              </span>
-            )}
           </div>
 
           {/* Active Filters Summary */}
@@ -433,56 +386,38 @@ export default function HomePage() {
             activeFilters.price_min ||
             activeFilters.price_max ||
             showNearby) && (
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 border-t border-white/10 pt-3">
-              <span className="text-xs text-gray-500">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-t border-white/10 pt-2 text-xs">
+              <span className="text-gray-400">
                 {data?.total || listings.length} results found
-                {showNearby && " 📍 Nearby"}
+                {showNearby && " • 📍 Nearby"}
                 {activeFilters.house_type &&
                   ` • ${HOUSE_TYPES.find((t) => t.value === activeFilters.house_type)?.label}`}
                 {activeFilters.location && ` • 📍 ${activeFilters.location}`}
-                {activeFilters.price_min && ` • From KSh ${activeFilters.price_min}`}
-                {activeFilters.price_max && ` • To KSh ${activeFilters.price_max}`}
               </span>
               <button
                 type="button"
                 onClick={clearFilters}
-                className="text-xs text-blue-400 hover:text-blue-300 transition"
+                className="text-blue-400 hover:text-blue-300 transition underline"
               >
-                Clear all filters ✕
+                Clear all filters
               </button>
             </div>
           )}
         </form>
       </div>
 
-      {/* Listings Grid */}
+      {/* Listings Grid - Responsive Grid standard */}
       {listings.length === 0 ? (
-        <div className="text-center py-12 sm:py-16 bg-black/90 backdrop-blur-md rounded-2xl border border-white/10">
-          <svg
-            className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-3 sm:mb-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-            />
-          </svg>
-          <p className="text-gray-400 text-sm sm:text-base">
-            No listings found. Try adjusting your filters or{" "}
-            <Link
-              to="/create-listing"
-              className="text-blue-400 hover:text-blue-300 transition"
-            >
-              post your own listing!
+        <div className="text-center py-12 bg-black/90 backdrop-blur-md rounded-2xl border border-white/10">
+          <p className="text-gray-400 text-sm">
+            No listings found. Try adjusting filters or{" "}
+            <Link to="/create-listing" className="text-blue-400 hover:text-blue-300">
+              post your listing!
             </Link>
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
           {listings.map((listing) => {
             const expiry = getExpiryStatus(
               listing.expiry_status,
@@ -497,7 +432,7 @@ export default function HomePage() {
                 imageUrl={listing.cover_image}
                 intensity={0.2}
                 blur={40}
-                className="rounded-xl overflow-hidden transition-colors duration-700 shadow-xl"
+                className="rounded-xl overflow-hidden shadow-xl"
               >
                 <Link to={`/listing/${listing.id}`}>
                   <div className={`card group ${isExpired ? "opacity-60" : ""}`}>
@@ -512,7 +447,7 @@ export default function HomePage() {
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <svg
-                            className="w-12 h-12 sm:w-16 sm:h-16 text-gray-700"
+                            className="w-12 h-12 text-gray-700"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -555,31 +490,12 @@ export default function HomePage() {
                         {listing.title}
                       </h3>
 
-                      <p className="text-gray-500 text-xs sm:text-sm mb-1.5 flex items-center gap-1">
-                        <svg
-                          className="w-3 h-3 sm:w-4 sm:h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                        </svg>
-                        {listing.location}
+                      <p className="text-gray-400 text-xs mb-1.5 flex items-center gap-1">
+                        📍 {listing.location}
                       </p>
 
                       <div className="flex items-center justify-between">
-                        <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-base sm:text-xl">
+                        <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-base sm:text-lg">
                           KSh {listing.price?.toLocaleString()}
                         </p>
                       </div>
