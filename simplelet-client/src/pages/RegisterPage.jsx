@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import API from "../services/api";
 import SafetyTip from "../components/SafetyTip";
 import PhonePromptModal from "../components/PhonePromptModal";
+import { EyeIcon, EyeSlashIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 
 const SECURITY_QUESTIONS = [
   { key: "mother_maiden_name", label: "What is your mother's maiden name?" },
@@ -20,11 +21,11 @@ const getErrorMessage = (error) => {
   const status = error.response?.status;
   const data = error.response?.data;
 
-  if (status === 409) return "📱 This phone number is already registered. Please login.";
-  if (status === 400) return data?.error || "⚠️ Please check your information and try again.";
-  if (!error.response) return "📡 Network error. Please check your connection.";
+  if (status === 409) return "This phone number is already registered. Please login.";
+  if (status === 400) return data?.error || "Please check your information and try again.";
+  if (!error.response) return "Network error. Please check your connection.";
 
-  return data?.message || data?.error || "❌ Something went wrong. Please try again.";
+  return data?.message || data?.error || "Something went wrong. Please try again.";
 };
 
 const registerUser = async (payload) => {
@@ -52,6 +53,10 @@ export default function RegisterPage() {
     securityAnswer: "",
   });
 
+  const isPhoneValid = /^\+254[0-9]{9}$/.test(formData.phone);
+  const isPasswordLengthValid = formData.password.length >= 6;
+  const doPasswordsMatch = formData.confirmPassword.length > 0 && formData.password === formData.confirmPassword;
+
   const googleAuthMutation = useMutation({
     mutationFn: verifyGoogleToken,
     onSuccess: (data) => {
@@ -61,7 +66,7 @@ export default function RegisterPage() {
       if (!data.user.phone) {
         setShowPhoneModal(true);
       } else {
-        toast.success("🎉 Welcome to SimpleLet!");
+        toast.success("Welcome to SimpleLet!");
         navigate("/");
       }
     },
@@ -76,7 +81,7 @@ export default function RegisterPage() {
       setFieldErrors({});
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
-      toast.success("🎉 Account created successfully! Welcome to SimpleLet!");
+      toast.success("Account created successfully!");
       navigate("/");
     },
     onError: (error) => {
@@ -86,23 +91,31 @@ export default function RegisterPage() {
     },
   });
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (fieldErrors[name]) {
+      setFieldErrors((current) => ({ ...current, [name]: null }));
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      setFieldErrors({ name: "👤 Please enter your full name." });
+      setFieldErrors({ name: "Please enter your full name." });
       return;
     }
-    if (!formData.phone.match(/^\+254[0-9]{9}$/)) {
-      setFieldErrors({ phone: "📱 Format: +254XXXXXXXXX (9 digits after +254)" });
+    if (!isPhoneValid) {
+      setFieldErrors({ phone: "Format must be +254XXXXXXXXX (9 digits after +254)" });
       return;
     }
-    if (formData.password.length < 6) {
-      setFieldErrors({ password: "🔑 Password must be at least 6 characters." });
+    if (!isPasswordLengthValid) {
+      setFieldErrors({ password: "Password must be at least 6 characters." });
       return;
     }
     if (formData.password !== formData.confirmPassword) {
-      setFieldErrors({ confirmPassword: "🔑 Passwords do not match." });
+      setFieldErrors({ confirmPassword: "Passwords do not match." });
       return;
     }
 
@@ -116,21 +129,14 @@ export default function RegisterPage() {
     });
   };
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (fieldErrors[e.target.name]) {
-      setFieldErrors((current) => ({ ...current, [e.target.name]: null }));
-    }
-  };
-
   return (
-    <div className="max-w-md mx-auto">
-      <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-6 sm:p-8 shadow-xl">
-        <h2 className="text-2xl font-bold text-center mb-2 heading-gradient">
+    <div className="max-w-md mx-auto my-8 px-4">
+      <div className="bg-[#121212] rounded-2xl border border-white/10 p-6 sm:p-8 shadow-2xl">
+        <h2 className="text-2xl font-bold text-center mb-2 text-white">
           Create an Account
         </h2>
         <p className="text-center text-gray-400 text-sm mb-6">
-          Join SimpleLet and start posting properties
+          Join SimpleLet and start exploring properties
         </p>
 
         <SafetyTip page="register" className="mb-6" />
@@ -157,95 +163,161 @@ export default function RegisterPage() {
               <div className="w-full border-t border-white/10"></div>
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-[#0a0a0a] px-3 text-gray-500 font-medium">
+              <span className="bg-[#121212] px-3 text-gray-400 font-medium">
                 Or register with phone
               </span>
             </div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Full Name */}
           <div>
-            <label className="label">Full Name</label>
+            <label className="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">
+              Full Name
+            </label>
             <input
               type="text"
               name="name"
               value={formData.name}
               onChange={handleChange}
               placeholder="John Doe"
-              className="input"
+              className={`w-full bg-black/40 border ${
+                fieldErrors.name ? "border-red-500/80" : "border-white/10 focus:border-blue-500"
+              } rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all`}
               required
             />
-            {fieldErrors.name && <p className="text-red-400 text-[10px] mt-1">{fieldErrors.name}</p>}
+            {fieldErrors.name && <p className="text-red-400 text-xs mt-1.5">{fieldErrors.name}</p>}
           </div>
 
+          {/* Phone Number */}
           <div>
-            <label className="label">Phone Number</label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="+254712345678"
-              className="input"
-              required
-            />
-            {fieldErrors.phone && <p className="text-red-400 text-[10px] mt-1">{fieldErrors.phone}</p>}
+            <label className="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">
+              Phone Number
+            </label>
+            <div className="relative">
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="+254712345678"
+                className={`w-full bg-black/40 border ${
+                  fieldErrors.phone
+                    ? "border-red-500/80"
+                    : isPhoneValid
+                    ? "border-blue-500/80 focus:border-blue-500"
+                    : "border-white/10 focus:border-blue-500"
+                } rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all`}
+                required
+              />
+              {isPhoneValid && (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <CheckCircleIcon className="w-5 h-5 text-blue-400" />
+                </div>
+              )}
+            </div>
+            {fieldErrors.phone ? (
+              <p className="text-red-400 text-xs mt-1.5">{fieldErrors.phone}</p>
+            ) : (
+              <p className="text-[11px] text-gray-500 mt-1">Format: +254712345678</p>
+            )}
           </div>
 
+          {/* Password */}
           <div>
-            <label className="label">Password</label>
+            <label className="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">
+              Password
+            </label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="Create password (min 6 chars)"
-                className="input pr-10"
+                placeholder="At least 6 characters"
+                className={`w-full bg-black/40 border ${
+                  fieldErrors.password ? "border-red-500/80" : "border-white/10 focus:border-blue-500"
+                } rounded-xl px-4 py-3 pr-10 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all`}
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition"
               >
-                {showPassword ? "🙈" : "👁️"}
+                {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
               </button>
             </div>
-            {fieldErrors.password && <p className="text-red-400 text-[10px] mt-1">{fieldErrors.password}</p>}
+            {/* Real-time indicator bar */}
+            {formData.password.length > 0 && (
+              <div className="mt-2 flex items-center gap-2">
+                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      formData.password.length >= 8
+                        ? "w-full bg-blue-500"
+                        : formData.password.length >= 6
+                        ? "w-2/3 bg-blue-400"
+                        : "w-1/3 bg-blue-600/50"
+                    }`}
+                  />
+                </div>
+                <span className="text-[10px] text-gray-400">
+                  {formData.password.length >= 8 ? "Strong" : formData.password.length >= 6 ? "Good" : "Weak"}
+                </span>
+              </div>
+            )}
+            {fieldErrors.password && <p className="text-red-400 text-xs mt-1.5">{fieldErrors.password}</p>}
           </div>
 
+          {/* Confirm Password */}
           <div>
-            <label className="label">Confirm Password</label>
+            <label className="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">
+              Confirm Password
+            </label>
             <div className="relative">
               <input
                 type={showConfirmPassword ? "text" : "password"}
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                placeholder="Confirm password"
-                className="input pr-10"
+                placeholder="Re-enter password"
+                className={`w-full bg-black/40 border ${
+                  fieldErrors.confirmPassword
+                    ? "border-red-500/80"
+                    : doPasswordsMatch
+                    ? "border-blue-500/80"
+                    : "border-white/10 focus:border-blue-500"
+                } rounded-xl px-4 py-3 pr-10 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all`}
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition"
               >
-                {showConfirmPassword ? "🙈" : "👁️"}
+                {showConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
               </button>
             </div>
-            {fieldErrors.confirmPassword && <p className="text-red-400 text-[10px] mt-1">{fieldErrors.confirmPassword}</p>}
+            {doPasswordsMatch && (
+              <p className="text-blue-400 text-xs mt-1 flex items-center gap-1">
+                <CheckCircleIcon className="w-4 h-4" /> Passwords match
+              </p>
+            )}
+            {fieldErrors.confirmPassword && <p className="text-red-400 text-xs mt-1.5">{fieldErrors.confirmPassword}</p>}
           </div>
 
+          {/* Security Question */}
           <div>
-            <label className="label">Security Question</label>
+            <label className="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">
+              Security Question
+            </label>
             <select
               name="securityQuestionKey"
               value={formData.securityQuestionKey}
               onChange={handleChange}
-              className="input"
+              className="w-full bg-[#181818] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 transition-all"
             >
               <option value="">Choose one question</option>
               {SECURITY_QUESTIONS.map((q) => (
@@ -254,30 +326,34 @@ export default function RegisterPage() {
             </select>
           </div>
 
+          {/* Security Answer */}
           <div>
-            <label className="label">Security Answer</label>
+            <label className="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">
+              Security Answer
+            </label>
             <input
               type="text"
               name="securityAnswer"
               value={formData.securityAnswer}
               onChange={handleChange}
               placeholder="Your answer"
-              className="input"
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-all"
             />
           </div>
 
+          {/* Submit Button */}
           <button
             type="submit"
             disabled={registerMutation.isPending}
-            className="w-full btn-primary"
+            className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800/50 text-white font-bold py-3.5 rounded-xl text-sm transition-all duration-200 shadow-lg shadow-blue-600/20"
           >
-            {registerMutation.isPending ? "Registering..." : "Create Account"}
+            {registerMutation.isPending ? "Creating Account..." : "Create Account"}
           </button>
 
-          <div className="text-center">
+          <div className="text-center pt-2">
             <p className="text-sm text-gray-400">
               Already have an account?{" "}
-              <Link to="/login" className="text-blue-400 hover:text-blue-300">
+              <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium underline">
                 Login here
               </Link>
             </p>
@@ -289,7 +365,7 @@ export default function RegisterPage() {
         isOpen={showPhoneModal}
         onClose={() => setShowPhoneModal(false)}
         onSuccess={() => {
-          toast.success("🎉 Welcome to SimpleLet!");
+          toast.success("Welcome to SimpleLet!");
           navigate("/");
         }}
       />
