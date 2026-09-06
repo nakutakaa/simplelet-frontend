@@ -9,7 +9,6 @@ import SimpleAmbientBackground from "../components/SimpleAmbientBackground";
 import { useRealTimeListings } from "../hooks";
 import slateBg from "../assets/images/slate-bg.jpg";
 
-// House types for filter dropdown
 const HOUSE_TYPES = [
   { value: "", label: "All Types" },
   { value: "bedsitter", label: "Bedsitter" },
@@ -23,7 +22,6 @@ const HOUSE_TYPES = [
   { value: "commercial", label: "Commercial Space" },
 ];
 
-// Sort options
 const SORT_OPTIONS = [
   { value: "newest", label: "Newest First" },
   { value: "price_asc", label: "Price: Low to High" },
@@ -31,7 +29,6 @@ const SORT_OPTIONS = [
   { value: "distance", label: "Nearest First" },
 ];
 
-// Property type similarity mapping
 const PROPERTY_TYPE_SIMILARITY = {
   studio: ["bedsitter", "single_room"],
   bedsitter: ["studio", "single_room"],
@@ -51,10 +48,8 @@ const fetchListings = async (params) => {
 export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Separate state for search input (local only, no API trigger)
-  const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
-
-  const [filters, setFilters] = useState({
+  // Local form state for fast, lag-free user input typing
+  const [formState, setFormState] = useState({
     search: searchParams.get("search") || "",
     house_type: searchParams.get("house_type") || "",
     location: searchParams.get("location") || "",
@@ -64,17 +59,21 @@ export default function HomePage() {
     nearby: searchParams.get("nearby") || "",
   });
 
+  // Active query filters state - ONLY this state triggers React Query and URL updates
+  const [activeFilters, setActiveFilters] = useState(formState);
+
   const [userLocation, setUserLocation] = useState(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const [showNearby, setShowNearby] = useState(false);
+  const [showNearby, setShowNearby] = useState(Boolean(searchParams.get("nearby")));
 
   const currentUser = JSON.parse(localStorage.getItem("user") || "null");
   const userId = currentUser?.id || currentUser?.user_id || null;
-  const { newListings } = useRealTimeListings(null, userId, filters);
+  const { newListings } = useRealTimeListings(null, userId, activeFilters);
 
+  // Query only fires when activeFilters change (not on raw input typing)
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["listings", filters],
-    queryFn: () => fetchListings(filters),
+    queryKey: ["listings", activeFilters],
+    queryFn: () => fetchListings(activeFilters),
   });
 
   const allListings = [
@@ -90,44 +89,51 @@ export default function HomePage() {
   });
   const uniqueListings = Array.from(uniqueListingsMap.values());
 
+  // Debounce typed text inputs (500ms delay before triggering query/URL update)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setActiveFilters(formState);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [formState]);
+
+  // Sync URL search params only when activeFilters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    Object.entries(activeFilters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    setSearchParams(params, { replace: true });
+  }, [activeFilters, setSearchParams]);
+
   useEffect(() => {
     if (error) {
       toast.error("Failed to load listings");
     }
   }, [error]);
 
-  // Update URL params when filters change
-  useEffect(() => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.set(key, value);
-    });
-    setSearchParams(params);
-  }, [filters, setSearchParams]);
-
-  // ============ HANDLERS ============
-
-  // Update search input (local state only) – does NOT trigger API
-  const handleSearchInputChange = (e) => {
-    setSearchInput(e.target.value);
+  // Handles fast local input state changes without triggering re-fetches
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormState((prev) => ({ ...prev, [name]: value }));
   };
 
-  // On form submit: update filters.search and refetch
+  // Instant update for select dropdowns
+  const handleSelectChange = (e) => {
+    const { name, value } = e.target;
+    const updated = { ...formState, [name]: value };
+    setFormState(updated);
+    setActiveFilters(updated);
+  };
+
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    setFilters((prev) => ({ ...prev, search: searchInput }));
-    refetch();
-  };
-
-  // Handle filter dropdown/input changes (non-search)
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters((prev) => ({ ...prev, [name]: value }));
-    // Refetch automatically because filters changed and useQuery will detect
+    setActiveFilters(formState);
   };
 
   const clearFilters = () => {
-    setFilters({
+    const reset = {
       search: "",
       house_type: "",
       location: "",
@@ -135,11 +141,11 @@ export default function HomePage() {
       price_max: "",
       sort_by: "newest",
       nearby: "",
-    });
-    setSearchInput("");
+    };
+    setFormState(reset);
+    setActiveFilters(reset);
     setShowNearby(false);
     setUserLocation(null);
-    refetch();
   };
 
   // ============ GET USER LOCATION FOR NEARBY SEARCH ============
@@ -151,23 +157,22 @@ export default function HomePage() {
           const { latitude, longitude } = position.coords;
           setUserLocation({ lat: latitude, lng: longitude });
           setShowNearby(true);
-          setFilters((prev) => ({
-            ...prev,
+          const updated = {
+            ...formState,
             nearby: `${latitude},${longitude}`,
             sort_by: "distance",
-          }));
+          };
+          setFormState(updated);
+          setActiveFilters(updated);
           toast.success("📍 Location found! Showing nearby listings.");
           setIsGettingLocation(false);
-          refetch();
         },
         (error) => {
           console.error("Geolocation error:", error);
-          toast.error(
-            "Could not get your location. Please enable location services.",
-          );
+          toast.error("Could not get your location. Please enable location services.");
           setIsGettingLocation(false);
         },
-        { enableHighAccuracy: true, timeout: 10000 },
+        { enableHighAccuracy: true, timeout: 10000 }
       );
     } else {
       toast.error("Geolocation is not supported by your browser.");
@@ -175,15 +180,13 @@ export default function HomePage() {
     }
   };
 
-  // ============ GET SIMILAR PROPERTY TYPES ============
   const getSimilarTypes = (type) => {
     if (!type) return [];
     return PROPERTY_TYPE_SIMILARITY[type] || [];
   };
 
-  // ============ RENDER SUGGESTIONS ============
   const renderSuggestions = () => {
-    const currentType = filters.house_type;
+    const currentType = formState.house_type;
     if (!currentType) return null;
 
     const similarTypes = getSimilarTypes(currentType);
@@ -197,7 +200,9 @@ export default function HomePage() {
             key={type}
             type="button"
             onClick={() => {
-              setFilters((prev) => ({ ...prev, house_type: type }));
+              const updated = { ...formState, house_type: type };
+              setFormState(updated);
+              setActiveFilters(updated);
             }}
             className="text-xs bg-white/5 hover:bg-white/10 text-gray-300 px-2 py-0.5 rounded-full border border-white/10 transition"
           >
@@ -208,7 +213,6 @@ export default function HomePage() {
     );
   };
 
-  // Get expiry status color and label
   const getExpiryStatus = (status, statusText) => {
     const configs = {
       active: {
@@ -236,7 +240,6 @@ export default function HomePage() {
     return { ...config, label: statusText || config.label };
   };
 
-  // Get credibility badge
   const getCredibilityBadge = (badge) => {
     if (!badge) return null;
     const icons = {
@@ -259,9 +262,7 @@ export default function HomePage() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-400">
-          Failed to load listings. Please try again.
-        </p>
+        <p className="text-red-400">Failed to load listings. Please try again.</p>
         <button onClick={() => refetch()} className="btn-primary mt-4 text-sm">
           Retry
         </button>
@@ -270,7 +271,7 @@ export default function HomePage() {
   }
 
   const listings = uniqueListings;
-  const hasLocation = userLocation || filters.nearby;
+  const hasLocation = userLocation || activeFilters.nearby;
 
   return (
     <div
@@ -308,8 +309,8 @@ export default function HomePage() {
               name="search"
               placeholder="Search properties..."
               className="flex-1 input"
-              value={searchInput}
-              onChange={handleSearchInputChange}
+              value={formState.search}
+              onChange={handleInputChange}
             />
             <button type="submit" className="btn-primary w-full sm:w-auto">
               <svg
@@ -334,8 +335,8 @@ export default function HomePage() {
               <label className="label">Type</label>
               <select
                 name="house_type"
-                value={filters.house_type}
-                onChange={handleFilterChange}
+                value={formState.house_type}
+                onChange={handleSelectChange}
                 className="input"
               >
                 {HOUSE_TYPES.map((type) => (
@@ -351,8 +352,8 @@ export default function HomePage() {
               <input
                 type="text"
                 name="location"
-                value={filters.location}
-                onChange={handleFilterChange}
+                value={formState.location}
+                onChange={handleInputChange}
                 placeholder="e.g., Kilimani"
                 className="input"
               />
@@ -363,8 +364,8 @@ export default function HomePage() {
               <input
                 type="number"
                 name="price_min"
-                value={filters.price_min}
-                onChange={handleFilterChange}
+                value={formState.price_min}
+                onChange={handleInputChange}
                 placeholder="0"
                 className="input"
               />
@@ -375,8 +376,8 @@ export default function HomePage() {
               <input
                 type="number"
                 name="price_max"
-                value={filters.price_max}
-                onChange={handleFilterChange}
+                value={formState.price_max}
+                onChange={handleInputChange}
                 placeholder="1000000"
                 className="input"
               />
@@ -386,8 +387,8 @@ export default function HomePage() {
               <label className="label">Sort By</label>
               <select
                 name="sort_by"
-                value={filters.sort_by}
-                onChange={handleFilterChange}
+                value={formState.sort_by}
+                onChange={handleSelectChange}
                 className="input"
               >
                 {SORT_OPTIONS.map((option) => (
@@ -399,7 +400,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* ============ NEARBY SEARCH BUTTON ============ */}
+          {/* NEARBY SEARCH BUTTON */}
           <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-white/10">
             <SafetyTip page="price" className="w-full mb-2" />
 
@@ -431,12 +432,13 @@ export default function HomePage() {
                 onClick={() => {
                   setShowNearby(false);
                   setUserLocation(null);
-                  setFilters((prev) => ({
-                    ...prev,
+                  const updated = {
+                    ...formState,
                     nearby: "",
                     sort_by: "newest",
-                  }));
-                  refetch();
+                  };
+                  setFormState(updated);
+                  setActiveFilters(updated);
                 }}
                 className="text-xs text-red-400 hover:text-red-300 transition"
               >
@@ -455,21 +457,21 @@ export default function HomePage() {
           {renderSuggestions()}
 
           {/* Active Filters Summary */}
-          {(filters.search ||
-            filters.house_type ||
-            filters.location ||
-            filters.price_min ||
-            filters.price_max ||
+          {(formState.search ||
+            formState.house_type ||
+            formState.location ||
+            formState.price_min ||
+            formState.price_max ||
             showNearby) && (
             <div className="flex flex-col sm:flex-row justify-between items-center gap-2 border-t border-white/10 pt-3">
               <span className="text-xs text-gray-500">
                 {data?.total || 0} results found
                 {showNearby && " 📍 Nearby"}
-                {filters.house_type &&
-                  ` • ${HOUSE_TYPES.find((t) => t.value === filters.house_type)?.label}`}
-                {filters.location && ` • 📍 ${filters.location}`}
-                {filters.price_min && ` • From KSh ${filters.price_min}`}
-                {filters.price_max && ` • To KSh ${filters.price_max}`}
+                {formState.house_type &&
+                  ` • ${HOUSE_TYPES.find((t) => t.value === formState.house_type)?.label}`}
+                {formState.location && ` • 📍 ${formState.location}`}
+                {formState.price_min && ` • From KSh ${formState.price_min}`}
+                {formState.price_max && ` • To KSh ${formState.price_max}`}
               </span>
               <button
                 type="button"
@@ -513,12 +515,13 @@ export default function HomePage() {
               onClick={() => {
                 setShowNearby(false);
                 setUserLocation(null);
-                setFilters((prev) => ({
-                  ...prev,
+                const updated = {
+                  ...formState,
                   nearby: "",
                   sort_by: "newest",
-                }));
-                refetch();
+                };
+                setFormState(updated);
+                setActiveFilters(updated);
               }}
               className="btn-outline text-sm mt-4"
             >
@@ -528,17 +531,17 @@ export default function HomePage() {
         </div>
       ) : (
         <>
-          {/* ============ SMART SEARCH RESULT INFO ============ */}
-          {filters.house_type && (
+          {/* SMART SEARCH RESULT INFO */}
+          {activeFilters.house_type && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 bg-black/80 backdrop-blur-sm p-2 rounded-xl border border-white/5">
               <span>🔍 Showing:</span>
               <span className="text-white font-medium">
-                {HOUSE_TYPES.find((t) => t.value === filters.house_type)?.label}
+                {HOUSE_TYPES.find((t) => t.value === activeFilters.house_type)?.label}
               </span>
-              {getSimilarTypes(filters.house_type).length > 0 && (
+              {getSimilarTypes(activeFilters.house_type).length > 0 && (
                 <>
                   <span>+ similar:</span>
-                  {getSimilarTypes(filters.house_type).map((type) => (
+                  {getSimilarTypes(activeFilters.house_type).map((type) => (
                     <span key={type} className="text-gray-300">
                       {HOUSE_TYPES.find((t) => t.value === type)?.label}
                     </span>
@@ -555,16 +558,16 @@ export default function HomePage() {
             {listings.map((listing) => {
               const expiry = getExpiryStatus(
                 listing.expiry_status,
-                listing.expiry_status_text,
+                listing.expiry_status_text
               );
               const isExpired =
                 listing.is_expired || listing.expiry_status === "expired";
               const hasBadge = listing.author?.badge;
               const isSimilar =
-                filters.house_type &&
-                listing.house_type !== filters.house_type &&
-                getSimilarTypes(filters.house_type).includes(
-                  listing.house_type,
+                activeFilters.house_type &&
+                listing.house_type !== activeFilters.house_type &&
+                getSimilarTypes(activeFilters.house_type).includes(
+                  listing.house_type
                 );
 
               return (
