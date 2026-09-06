@@ -1,5 +1,5 @@
 // src/pages/HomePage.jsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import API from "../services/api";
@@ -49,25 +49,21 @@ export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchInputRef = useRef(null);
 
-  // ============ FIX: Separate search query from active filters ============
-  // searchQuery - what the user types (no API calls)
-  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
-  
-  // activeSearch - ONLY updated when user clicks Search or presses Enter
-  const [activeSearch, setActiveSearch] = useState(searchParams.get("search") || "");
+  // Input state for text search box
+  const [searchInput, setSearchInput] = useState(() => searchParams.get("search") || "");
 
-  // Other filters (these still update immediately, but don't trigger API calls alone)
-  const [filters, setFilters] = useState({
+  // Form state for other inputs/filters
+  const [filters, setFilters] = useState(() => ({
     house_type: searchParams.get("house_type") || "",
     location: searchParams.get("location") || "",
     price_min: searchParams.get("price_min") || "",
     price_max: searchParams.get("price_max") || "",
     sort_by: searchParams.get("sort_by") || "newest",
     nearby: searchParams.get("nearby") || "",
-  });
+  }));
 
-  // Active filters that trigger API calls
-  const [activeFilters, setActiveFilters] = useState({
+  // Active filters that trigger the API call
+  const [activeFilters, setActiveFilters] = useState(() => ({
     search: searchParams.get("search") || "",
     house_type: searchParams.get("house_type") || "",
     location: searchParams.get("location") || "",
@@ -75,7 +71,7 @@ export default function HomePage() {
     price_max: searchParams.get("price_max") || "",
     sort_by: searchParams.get("sort_by") || "newest",
     nearby: searchParams.get("nearby") || "",
-  });
+  }));
 
   const [userLocation, setUserLocation] = useState(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
@@ -83,86 +79,65 @@ export default function HomePage() {
 
   const currentUser = JSON.parse(localStorage.getItem("user") || "null");
   const userId = currentUser?.id || currentUser?.user_id || null;
-  const { newListings } = useRealTimeListings(null, userId, activeFilters);
 
-  // Query only fires when activeFilters change
+  // Real-time listings hook
+  const { newListings = [] } = useRealTimeListings(null, userId, activeFilters);
+
+  // Query execution
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["listings", activeFilters],
     queryFn: () => fetchListings(activeFilters),
   });
 
-  const allListings = [
-    ...(newListings || []),
-    ...((Array.isArray(data) ? data : data?.data || data?.listings || []) || []),
-  ];
-
-  const uniqueListingsMap = new Map();
-  allListings.forEach((listing) => {
-    if (!uniqueListingsMap.has(listing.id)) {
-      uniqueListingsMap.set(listing.id, listing);
-    }
-  });
-  const uniqueListings = Array.from(uniqueListingsMap.values());
-
-  // ============ FIX: ONLY update URL and active filters when search is submitted ============
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    const newActive = {
-      ...filters,
-      search: searchQuery,  // Use the current search query
-    };
-    setActiveFilters(newActive);
-    setActiveSearch(searchQuery);
-    updateURL(newActive);
-  };
-
-  // ============ FIX: Handle Enter key on search input ============
-  const handleSearchKeyDown = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const newActive = {
-        ...filters,
-        search: searchQuery,
-      };
-      setActiveFilters(newActive);
-      setActiveSearch(searchQuery);
-      updateURL(newActive);
-    }
-  };
-
-  // ============ Update URL ============
-  const updateURL = (filtersToUpdate) => {
+  // URL Sync Helper
+  const updateURL = useCallback((paramsToUpdate) => {
     const params = new URLSearchParams();
-    Object.entries(filtersToUpdate).forEach(([key, value]) => {
+    Object.entries(paramsToUpdate).forEach(([key, value]) => {
       if (value) params.set(key, value);
     });
     setSearchParams(params, { replace: true });
+  }, [setSearchParams]);
+
+  // Handle Search Submission (Button or Enter)
+  const executeSearch = () => {
+    const newActive = {
+      ...filters,
+      search: searchInput,
+    };
+    setActiveFilters(newActive);
+    updateURL(newActive);
   };
 
-  // ============ Handle filter changes (without triggering API) ============
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    executeSearch();
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      executeSearch();
+    }
+  };
+
+  // Handle filter controls (Dropdowns, Inputs)
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     const updatedFilters = { ...filters, [name]: value };
     setFilters(updatedFilters);
-    
-    // For dropdowns, update active filters immediately (except search)
-    if (name !== "search") {
+
+    // Dropdowns trigger search immediately using currently active search query
+    if (name === "house_type" || name === "sort_by") {
       const newActive = {
         ...updatedFilters,
-        search: searchQuery,
+        search: activeFilters.search,
       };
       setActiveFilters(newActive);
       updateURL(newActive);
     }
   };
 
-  // ============ Handle search input change (NO API CALL) ============
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-  };
-
-  // ============ Clear all filters ============
+  // Clear filters
   const clearFilters = () => {
     const reset = {
       search: "",
@@ -173,8 +148,7 @@ export default function HomePage() {
       sort_by: "newest",
       nearby: "",
     };
-    setSearchQuery("");
-    setActiveSearch("");
+    setSearchInput("");
     setFilters(reset);
     setActiveFilters(reset);
     setShowNearby(false);
@@ -182,24 +156,27 @@ export default function HomePage() {
     updateURL(reset);
   };
 
-  // ============ GET USER LOCATION FOR NEARBY SEARCH ============
+  // Location handling
   const getUserLocation = () => {
     setIsGettingLocation(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
+          const coordsString = `${latitude},${longitude}`;
           setUserLocation({ lat: latitude, lng: longitude });
           setShowNearby(true);
+
           const updatedFilters = {
             ...filters,
-            nearby: `${latitude},${longitude}`,
+            nearby: coordsString,
             sort_by: "distance",
           };
           setFilters(updatedFilters);
+
           const newActive = {
             ...updatedFilters,
-            search: searchQuery,
+            search: activeFilters.search,
           };
           setActiveFilters(newActive);
           updateURL(newActive);
@@ -224,61 +201,23 @@ export default function HomePage() {
     return PROPERTY_TYPE_SIMILARITY[type] || [];
   };
 
-  const renderSuggestions = () => {
-    const currentType = filters.house_type;
-    if (!currentType) return null;
-
-    const similarTypes = getSimilarTypes(currentType);
-    if (similarTypes.length === 0) return null;
-
-    return (
-      <div className="flex flex-wrap gap-2 mt-2">
-        <span className="text-xs text-gray-400">Similar types:</span>
-        {similarTypes.map((type) => (
-          <button
-            key={type}
-            type="button"
-            onClick={() => {
-              const updatedFilters = { ...filters, house_type: type };
-              setFilters(updatedFilters);
-              const newActive = {
-                ...updatedFilters,
-                search: searchQuery,
-              };
-              setActiveFilters(newActive);
-              updateURL(newActive);
-            }}
-            className="text-xs bg-white/5 hover:bg-white/10 text-gray-300 px-2 py-0.5 rounded-full border border-white/10 transition"
-          >
-            {HOUSE_TYPES.find((t) => t.value === type)?.label || type}
-          </button>
-        ))}
-      </div>
-    );
-  };
+  // Flatten and Deduplicate Listings
+  const rawData = Array.isArray(data) ? data : data?.data || data?.listings || [];
+  const allListings = [...newListings, ...rawData];
+  const uniqueListingsMap = new Map();
+  allListings.forEach((listing) => {
+    if (listing?.id && !uniqueListingsMap.has(listing.id)) {
+      uniqueListingsMap.set(listing.id, listing);
+    }
+  });
+  const listings = Array.from(uniqueListingsMap.values());
 
   const getExpiryStatus = (status, statusText) => {
     const configs = {
-      active: {
-        color: "text-green-400",
-        bg: "bg-green-500/20",
-        label: "✅ Available",
-      },
-      needs_confirmation: {
-        color: "text-yellow-400",
-        bg: "bg-yellow-500/20",
-        label: "⏰ Confirm Soon",
-      },
-      warning: {
-        color: "text-orange-400",
-        bg: "bg-orange-500/20",
-        label: "⚠️ Expiring Soon",
-      },
-      expired: {
-        color: "text-red-400",
-        bg: "bg-red-500/20",
-        label: "❌ Expired",
-      },
+      active: { color: "text-green-400", bg: "bg-green-500/20", label: "✅ Available" },
+      needs_confirmation: { color: "text-yellow-400", bg: "bg-yellow-500/20", label: "⏰ Confirm Soon" },
+      warning: { color: "text-orange-400", bg: "bg-orange-500/20", label: "⚠️ Expiring Soon" },
+      expired: { color: "text-red-400", bg: "bg-red-500/20", label: "❌ Expired" },
     };
     const config = configs[status] || configs.active;
     return { ...config, label: statusText || config.label };
@@ -286,23 +225,9 @@ export default function HomePage() {
 
   const getCredibilityBadge = (badge) => {
     if (!badge) return null;
-    const icons = {
-      verified: "🟢",
-      trusted: "🟡",
-      caution: "🟠",
-      warning: "🔴",
-    };
+    const icons = { verified: "🟢", trusted: "🟡", caution: "🟠", warning: "🔴" };
     return icons[badge.level] || "⚪";
   };
-
-  // ============ Initialize from URL params ============
-  useEffect(() => {
-    const search = searchParams.get("search") || "";
-    if (search) {
-      setSearchQuery(search);
-      setActiveSearch(search);
-    }
-  }, []);
 
   if (isLoading) {
     return (
@@ -323,9 +248,6 @@ export default function HomePage() {
     );
   }
 
-  const listings = uniqueListings;
-  const hasLocation = userLocation || activeFilters.nearby;
-
   return (
     <div
       className="min-h-screen bg-cover bg-center bg-no-repeat bg-fixed space-y-4 sm:space-y-6 -mx-4 sm:-mx-6 lg:-mx-8 p-4 sm:p-6 lg:p-8"
@@ -338,8 +260,7 @@ export default function HomePage() {
         <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between backdrop-blur-sm">
           <span className="text-sm text-emerald-300 flex items-center gap-2">
             <span className="animate-pulse">🔔</span>
-            {newListings.length} new listing{newListings.length > 1 ? "s" : ""}{" "}
-            matching your search!
+            {newListings.length} new listing{newListings.length > 1 ? "s" : ""} matching your search!
           </span>
           <button
             onClick={() => refetch()}
@@ -362,8 +283,8 @@ export default function HomePage() {
               name="search"
               placeholder="Search properties..."
               className="flex-1 input"
-              value={searchQuery}
-              onChange={handleSearchChange}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={handleSearchKeyDown}
             />
             <button type="submit" className="btn-primary w-full sm:w-auto">
@@ -486,16 +407,9 @@ export default function HomePage() {
                 onClick={() => {
                   setShowNearby(false);
                   setUserLocation(null);
-                  const updatedFilters = {
-                    ...filters,
-                    nearby: "",
-                    sort_by: "newest",
-                  };
+                  const updatedFilters = { ...filters, nearby: "", sort_by: "newest" };
                   setFilters(updatedFilters);
-                  const newActive = {
-                    ...updatedFilters,
-                    search: searchQuery,
-                  };
+                  const newActive = { ...updatedFilters, search: activeFilters.search };
                   setActiveFilters(newActive);
                   updateURL(newActive);
                 }}
@@ -505,15 +419,12 @@ export default function HomePage() {
               </button>
             )}
 
-            {hasLocation && showNearby && (
+            {userLocation && showNearby && (
               <span className="text-[10px] text-gray-500">
                 Showing listings near you
               </span>
             )}
           </div>
-
-          {/* Similar Types Suggestions */}
-          {renderSuggestions()}
 
           {/* Active Filters Summary */}
           {(activeFilters.search ||
@@ -524,7 +435,7 @@ export default function HomePage() {
             showNearby) && (
             <div className="flex flex-col sm:flex-row justify-between items-center gap-2 border-t border-white/10 pt-3">
               <span className="text-xs text-gray-500">
-                {data?.total || 0} results found
+                {data?.total || listings.length} results found
                 {showNearby && " 📍 Nearby"}
                 {activeFilters.house_type &&
                   ` • ${HOUSE_TYPES.find((t) => t.value === activeFilters.house_type)?.label}`}
@@ -569,149 +480,39 @@ export default function HomePage() {
               post your own listing!
             </Link>
           </p>
-          {showNearby && (
-            <button
-              onClick={() => {
-                setShowNearby(false);
-                setUserLocation(null);
-                const updatedFilters = {
-                  ...filters,
-                  nearby: "",
-                  sort_by: "newest",
-                };
-                setFilters(updatedFilters);
-                const newActive = {
-                  ...updatedFilters,
-                  search: searchQuery,
-                };
-                setActiveFilters(newActive);
-                updateURL(newActive);
-              }}
-              className="btn-outline text-sm mt-4"
-            >
-              Turn off nearby search
-            </button>
-          )}
         </div>
       ) : (
-        <>
-          {/* SMART SEARCH RESULT INFO */}
-          {activeFilters.house_type && (
-            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 bg-black/80 backdrop-blur-sm p-2 rounded-xl border border-white/5">
-              <span>🔍 Showing:</span>
-              <span className="text-white font-medium">
-                {HOUSE_TYPES.find((t) => t.value === activeFilters.house_type)?.label}
-              </span>
-              {getSimilarTypes(activeFilters.house_type).length > 0 && (
-                <>
-                  <span>+ similar:</span>
-                  {getSimilarTypes(activeFilters.house_type).map((type) => (
-                    <span key={type} className="text-gray-300">
-                      {HOUSE_TYPES.find((t) => t.value === type)?.label}
-                    </span>
-                  ))}
-                </>
-              )}
-              {showNearby && (
-                <span className="text-blue-400 ml-2">📍 Nearby</span>
-              )}
-            </div>
-          )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+          {listings.map((listing) => {
+            const expiry = getExpiryStatus(
+              listing.expiry_status,
+              listing.expiry_status_text
+            );
+            const isExpired = listing.is_expired || listing.expiry_status === "expired";
+            const hasBadge = listing.author?.badge;
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {listings.map((listing) => {
-              const expiry = getExpiryStatus(
-                listing.expiry_status,
-                listing.expiry_status_text
-              );
-              const isExpired =
-                listing.is_expired || listing.expiry_status === "expired";
-              const hasBadge = listing.author?.badge;
-              const isSimilar =
-                activeFilters.house_type &&
-                listing.house_type !== activeFilters.house_type &&
-                getSimilarTypes(activeFilters.house_type).includes(
-                  listing.house_type
-                );
-
-              return (
-                <SimpleAmbientBackground
-                  key={listing.id}
-                  imageUrl={listing.cover_image}
-                  intensity={0.2}
-                  blur={40}
-                  className="rounded-xl overflow-hidden transition-colors duration-700 shadow-xl"
-                >
-                  <Link to={`/listing/${listing.id}`}>
-                    <div
-                      className={`card group ${isExpired ? "opacity-60" : ""}`}
-                    >
-                      <div className="aspect-[4/3] bg-[#0a0a0a] overflow-hidden relative">
-                        {listing.cover_image ? (
-                          <img
-                            src={listing.cover_image}
-                            alt={listing.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <svg
-                              className="w-12 h-12 sm:w-16 sm:h-16 text-gray-700"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.5}
-                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                              />
-                            </svg>
-                          </div>
-                        )}
-
-                        {/* Status Badge on Image */}
-                        {listing.is_taken ? (
-                          <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
-                            Taken
-                          </span>
-                        ) : isExpired ? (
-                          <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
-                            Expired
-                          </span>
-                        ) : (
-                          <span
-                            className={`absolute top-2 right-2 ${expiry.bg} ${expiry.color} text-[10px] px-2 py-0.5 rounded-full border border-current/20`}
-                          >
-                            {expiry.label}
-                          </span>
-                        )}
-
-                        {/* Credibility Badge on Image */}
-                        {hasBadge && (
-                          <span className="absolute top-2 left-2 text-xs">
-                            {getCredibilityBadge(hasBadge)}
-                          </span>
-                        )}
-
-                        {/* Similar Type Badge */}
-                        {isSimilar && (
-                          <span className="absolute bottom-2 left-2 bg-blue-500/80 text-white text-[8px] px-2 py-0.5 rounded-full">
-                            Similar
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="p-3 sm:p-4">
-                        <h3 className="font-semibold text-sm sm:text-base mb-0.5 line-clamp-1 text-white group-hover:text-blue-400 transition">
-                          {listing.title}
-                        </h3>
-
-                        <p className="text-gray-500 text-xs sm:text-sm mb-1.5 flex items-center gap-1">
+            return (
+              <SimpleAmbientBackground
+                key={listing.id}
+                imageUrl={listing.cover_image}
+                intensity={0.2}
+                blur={40}
+                className="rounded-xl overflow-hidden transition-colors duration-700 shadow-xl"
+              >
+                <Link to={`/listing/${listing.id}`}>
+                  <div className={`card group ${isExpired ? "opacity-60" : ""}`}>
+                    <div className="aspect-[4/3] bg-[#0a0a0a] overflow-hidden relative">
+                      {listing.cover_image ? (
+                        <img
+                          src={listing.cover_image}
+                          alt={listing.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
                           <svg
-                            className="w-3 h-3 sm:w-4 sm:h-4"
+                            className="w-12 h-12 sm:w-16 sm:h-16 text-gray-700"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -719,50 +520,76 @@ export default function HomePage() {
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                              strokeWidth={1.5}
+                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                             />
                           </svg>
-                          {listing.location}
-                        </p>
-
-                        <div className="flex items-center justify-between">
-                          <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-base sm:text-xl">
-                            KSh {listing.price?.toLocaleString()}
-                          </p>
-                          {listing.true_monthly_cost &&
-                            listing.true_monthly_cost !== listing.price && (
-                              <p className="text-[10px] text-gray-500">
-                                +
-                                {listing.service_charge
-                                  ? `KSh ${listing.service_charge}`
-                                  : ""}
-                              </p>
-                            )}
                         </div>
+                      )}
 
-                        {/* Days remaining */}
-                        {!isExpired &&
-                          !listing.is_taken &&
-                          listing.days_remaining !== undefined && (
-                            <p className={`text-[10px] mt-1 ${expiry.color}`}>
-                              {listing.days_remaining} days remaining
-                            </p>
-                          )}
+                      {listing.is_taken ? (
+                        <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
+                          Taken
+                        </span>
+                      ) : isExpired ? (
+                        <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
+                          Expired
+                        </span>
+                      ) : (
+                        <span
+                          className={`absolute top-2 right-2 ${expiry.bg} ${expiry.color} text-[10px] px-2 py-0.5 rounded-full border border-current/20`}
+                        >
+                          {expiry.label}
+                        </span>
+                      )}
+
+                      {hasBadge && (
+                        <span className="absolute top-2 left-2 text-xs">
+                          {getCredibilityBadge(hasBadge)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-3 sm:p-4">
+                      <h3 className="font-semibold text-sm sm:text-base mb-0.5 line-clamp-1 text-white group-hover:text-blue-400 transition">
+                        {listing.title}
+                      </h3>
+
+                      <p className="text-gray-500 text-xs sm:text-sm mb-1.5 flex items-center gap-1">
+                        <svg
+                          className="w-3 h-3 sm:w-4 sm:h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                        </svg>
+                        {listing.location}
+                      </p>
+
+                      <div className="flex items-center justify-between">
+                        <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-base sm:text-xl">
+                          KSh {listing.price?.toLocaleString()}
+                        </p>
                       </div>
                     </div>
-                  </Link>
-                </SimpleAmbientBackground>
-              );
-            })}
-          </div>
-        </>
+                  </div>
+                </Link>
+              </SimpleAmbientBackground>
+            );
+          })}
+        </div>
       )}
     </div>
   );
