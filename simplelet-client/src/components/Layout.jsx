@@ -143,14 +143,14 @@ export default function Layout({ children }) {
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-2 text-gray-200 hover:text-white py-2.5 px-3 rounded-lg hover:bg-white/5 transition"
                   >
-                    ⭐ Favorites
+                     Favorites
                   </Link>
                   <Link
                     to="/dashboard"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-2 text-gray-200 hover:text-white py-2.5 px-3 rounded-lg hover:bg-white/5 transition"
                   >
-                    📊 Dashboard
+                     Dashboard
                   </Link>
                   <Link
                     to="/profile"
