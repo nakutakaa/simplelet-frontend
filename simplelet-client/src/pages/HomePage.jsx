@@ -6,6 +6,7 @@ import API from "../services/api";
 import toast from "react-hot-toast";
 import SafetyTip from "../components/SafetyTip";
 import SimpleAmbientBackground from "../components/SimpleAmbientBackground";
+import ListingStoriesModal from "../components/ListingStoriesModal";
 import { useRealTimeListings } from "../hooks";
 import slateBg from "../assets/images/slate-bg.jpg";
 
@@ -40,6 +41,10 @@ export default function HomePage() {
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") || "");
+
+  // Stories Modal state
+  const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);
+  const [isStoryModalOpen, setIsStoryModalOpen] = useState(false);
 
   const [filters, setFilters] = useState(() => ({
     house_type: searchParams.get("house_type") || "",
@@ -150,7 +155,7 @@ export default function HomePage() {
           const newActive = { ...updatedFilters, search: activeFilters.search };
           setActiveFilters(newActive);
           updateURL(newActive);
-          toast.success("📍 Location found! Showing nearby listings.");
+          toast.success("Location found! Showing nearby listings.");
           setIsGettingLocation(false);
         },
         (error) => {
@@ -176,21 +181,21 @@ export default function HomePage() {
   });
   const listings = Array.from(uniqueListingsMap.values());
 
+  const handleOpenStories = (index = 0) => {
+    if (listings.length === 0) return;
+    setSelectedStoryIndex(index);
+    setIsStoryModalOpen(true);
+  };
+
   const getExpiryStatus = (status, statusText) => {
     const configs = {
-      active: { color: "text-green-400", bg: "bg-green-500/20", label: "✅ Available" },
-      needs_confirmation: { color: "text-yellow-400", bg: "bg-yellow-500/20", label: "⏰ Confirm Soon" },
-      warning: { color: "text-orange-400", bg: "bg-orange-500/20", label: "⚠️ Expiring Soon" },
-      expired: { color: "text-red-400", bg: "bg-red-500/20", label: "❌ Expired" },
+      active: { color: "text-green-400", bg: "bg-green-500/20", label: "Available" },
+      needs_confirmation: { color: "text-yellow-400", bg: "bg-yellow-500/20", label: "Confirm Soon" },
+      warning: { color: "text-orange-400", bg: "bg-orange-500/20", label: "Expiring Soon" },
+      expired: { color: "text-red-400", bg: "bg-red-500/20", label: "Expired" },
     };
     const config = configs[status] || configs.active;
     return { ...config, label: statusText || config.label };
-  };
-
-  const getCredibilityBadge = (badge) => {
-    if (!badge) return null;
-    const icons = { verified: "🟢", trusted: "🟡", caution: "🟠", warning: "🔴" };
-    return icons[badge.level] || "⚪";
   };
 
   if (isLoading) {
@@ -223,7 +228,7 @@ export default function HomePage() {
       {newListings.length > 0 && (
         <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between backdrop-blur-sm">
           <span className="text-xs sm:text-sm text-emerald-300 flex items-center gap-2">
-            <span className="animate-pulse">🔔</span>
+            <span className="animate-pulse">●</span>
             {newListings.length} new listing{newListings.length > 1 ? "s" : ""} matching your search!
           </span>
           <button
@@ -260,12 +265,12 @@ export default function HomePage() {
                 onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
                 className="sm:hidden px-3 py-2 bg-white/10 text-xs text-gray-300 rounded-lg border border-white/10 flex items-center gap-1"
               >
-                ⚙️ Filters {mobileFiltersOpen ? "▲" : "▼"}
+                Filters {mobileFiltersOpen ? "▲" : "▼"}
               </button>
             </div>
           </div>
 
-          {/* Filters Grid — Responsive Toggle for Small Screen Devices */}
+          {/* Filters Grid */}
           <div className={`${mobileFiltersOpen ? "block" : "hidden sm:grid"} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 pt-2`}>
             <div>
               <label className="label text-[11px] sm:text-xs">Type</label>
@@ -336,45 +341,57 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Nearby Mode Bar */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/10">
-            <button
-              type="button"
-              onClick={getUserLocation}
-              disabled={isGettingLocation}
-              className={`text-xs px-3 py-1.5 rounded-xl transition ${
-                showNearby
-                  ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                  : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"
-              }`}
-            >
-              {isGettingLocation ? (
-                <>
-                  <span className="animate-spin inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full mr-1.5"></span>
-                  Getting location...
-                </>
-              ) : showNearby ? (
-                "📍 Nearby mode ON"
-              ) : (
-                "📍 Show Nearby"
-              )}
-            </button>
-
-            {showNearby && (
+          {/* Action Bar with Nearby and Stories View Toggle */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/10">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setShowNearby(false);
-                  setUserLocation(null);
-                  const updatedFilters = { ...filters, nearby: "", sort_by: "newest" };
-                  setFilters(updatedFilters);
-                  const newActive = { ...updatedFilters, search: activeFilters.search };
-                  setActiveFilters(newActive);
-                  updateURL(newActive);
-                }}
-                className="text-xs text-red-400 hover:text-red-300 transition"
+                onClick={getUserLocation}
+                disabled={isGettingLocation}
+                className={`text-xs px-3 py-1.5 rounded-xl transition ${
+                  showNearby
+                    ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                    : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"
+                }`}
               >
-                ✕ Turn off nearby
+                {isGettingLocation ? (
+                  <>
+                    <span className="animate-spin inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full mr-1.5"></span>
+                    Getting location...
+                  </>
+                ) : showNearby ? (
+                  "Nearby mode ON"
+                ) : (
+                  "Show Nearby"
+                )}
+              </button>
+
+              {showNearby && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNearby(false);
+                    setUserLocation(null);
+                    const updatedFilters = { ...filters, nearby: "", sort_by: "newest" };
+                    setFilters(updatedFilters);
+                    const newActive = { ...updatedFilters, search: activeFilters.search };
+                    setActiveFilters(newActive);
+                    updateURL(newActive);
+                  }}
+                  className="text-xs text-red-400 hover:text-red-300 transition"
+                >
+                  Turn off nearby
+                </button>
+              )}
+            </div>
+
+            {listings.length > 0 && (
+              <button
+                type="button"
+                onClick={() => handleOpenStories(0)}
+                className="text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-1.5 rounded-xl shadow-lg transition flex items-center gap-2"
+              >
+                <span>Watch Stories</span>
               </button>
             )}
           </div>
@@ -389,10 +406,10 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-t border-white/10 pt-2 text-xs">
               <span className="text-gray-400">
                 {data?.total || listings.length} results found
-                {showNearby && " • 📍 Nearby"}
+                {showNearby && " • Nearby"}
                 {activeFilters.house_type &&
                   ` • ${HOUSE_TYPES.find((t) => t.value === activeFilters.house_type)?.label}`}
-                {activeFilters.location && ` • 📍 ${activeFilters.location}`}
+                {activeFilters.location && ` • ${activeFilters.location}`}
               </span>
               <button
                 type="button"
@@ -406,7 +423,7 @@ export default function HomePage() {
         </form>
       </div>
 
-      {/* Listings Grid - Responsive Grid standard */}
+      {/* Listings Grid with Stories Tap trigger */}
       {listings.length === 0 ? (
         <div className="text-center py-12 bg-black/90 backdrop-blur-md rounded-2xl border border-white/10">
           <p className="text-gray-400 text-sm">
@@ -418,95 +435,94 @@ export default function HomePage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
-          {listings.map((listing) => {
+          {listings.map((listing, index) => {
             const expiry = getExpiryStatus(
               listing.expiry_status,
               listing.expiry_status_text
             );
             const isExpired = listing.is_expired || listing.expiry_status === "expired";
-            const hasBadge = listing.author?.badge;
 
             return (
               <SimpleAmbientBackground
                 key={listing.id}
-                imageUrl={listing.cover_image}
+                imageUrl={listing.cover_image || listing.images?.[0]?.url}
                 intensity={0.2}
                 blur={40}
-                className="rounded-xl overflow-hidden shadow-xl"
+                className="rounded-xl overflow-hidden shadow-xl cursor-pointer"
               >
-                <Link to={`/listing/${listing.id}`}>
-                  <div className={`card group ${isExpired ? "opacity-60" : ""}`}>
-                    <div className="aspect-[4/3] bg-[#0a0a0a] overflow-hidden relative">
-                      {listing.cover_image ? (
-                        <img
-                          src={listing.cover_image}
-                          alt={listing.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <svg
-                            className="w-12 h-12 text-gray-700"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
-                        </div>
-                      )}
-
-                      {listing.is_taken ? (
-                        <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
-                          Taken
-                        </span>
-                      ) : isExpired ? (
-                        <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
-                          Expired
-                        </span>
-                      ) : (
-                        <span
-                          className={`absolute top-2 right-2 ${expiry.bg} ${expiry.color} text-[10px] px-2 py-0.5 rounded-full border border-current/20`}
+                <div onClick={() => handleOpenStories(index)} className={`card group ${isExpired ? "opacity-60" : ""}`}>
+                  <div className="aspect-[4/3] bg-[#0a0a0a] overflow-hidden relative">
+                    {listing.cover_image || listing.images?.[0]?.url ? (
+                      <img
+                        src={listing.cover_image || listing.images?.[0]?.url}
+                        alt={listing.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <svg
+                          className="w-12 h-12 text-gray-700"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
                         >
-                          {expiry.label}
-                        </span>
-                      )}
-
-                      {hasBadge && (
-                        <span className="absolute top-2 left-2 text-xs">
-                          {getCredibilityBadge(hasBadge)}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="p-3 sm:p-4">
-                      <h3 className="font-semibold text-sm sm:text-base mb-0.5 line-clamp-1 text-white group-hover:text-blue-400 transition">
-                        {listing.title}
-                      </h3>
-
-                      <p className="text-gray-400 text-xs mb-1.5 flex items-center gap-1">
-                        📍 {listing.location}
-                      </p>
-
-                      <div className="flex items-center justify-between">
-                        <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-base sm:text-lg">
-                          KSh {listing.price?.toLocaleString()}
-                        </p>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
                       </div>
+                    )}
+
+                    {listing.is_taken ? (
+                      <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
+                        Taken
+                      </span>
+                    ) : isExpired ? (
+                      <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] px-2 py-0.5 rounded-full">
+                        Expired
+                      </span>
+                    ) : (
+                      <span
+                        className={`absolute top-2 right-2 ${expiry.bg} ${expiry.color} text-[10px] px-2 py-0.5 rounded-full border border-current/20`}
+                      >
+                        {expiry.label}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="p-3 sm:p-4">
+                    <h3 className="font-semibold text-sm sm:text-base mb-0.5 line-clamp-1 text-white group-hover:text-blue-400 transition">
+                      {listing.title}
+                    </h3>
+
+                    <p className="text-gray-400 text-xs mb-1.5 flex items-center gap-1">
+                      📍 {listing.location}
+                    </p>
+
+                    <div className="flex items-center justify-between">
+                      <p className="text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text font-bold text-base sm:text-lg">
+                        KSh {listing.price?.toLocaleString()}
+                      </p>
                     </div>
                   </div>
-                </Link>
+                </div>
               </SimpleAmbientBackground>
             );
           })}
         </div>
       )}
+
+      {/* Stories Viewer Modal */}
+      <ListingStoriesModal
+        listings={listings}
+        initialIndex={selectedStoryIndex}
+        isOpen={isStoryModalOpen}
+        onClose={() => setIsStoryModalOpen(false)}
+      />
     </div>
   );
 }
