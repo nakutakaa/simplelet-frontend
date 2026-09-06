@@ -28,7 +28,7 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
   const currentListing = listings[currentListingIndex] || null;
   const listingId = currentListing?.id || currentListing?._id;
 
-  // Normalizing image extraction to ensure it never renders empty
+  // Normalizing image extraction
   const getListingImages = (item) => {
     if (!item) return [];
     if (Array.isArray(item.images) && item.images.length > 0) {
@@ -129,7 +129,8 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
       return;
     }
     onClose();
-    navigate(`/listings/${listingId}`);
+    // ============ FIX: Remove the 's' from 'listings' ============
+    navigate(`/listing/${listingId}`);  // ← Changed from '/listings/'
   };
 
   const toggleFavorite = async (e) => {
@@ -155,7 +156,7 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
     e.stopPropagation();
     if (!listingId) return;
 
-    const url = `${window.location.origin}/listings/${listingId}`;
+    const url = `${window.location.origin}/listing/${listingId}`;  // ← Also fixed here
     if (navigator.share) {
       navigator.share({
         title: currentListing?.title,
