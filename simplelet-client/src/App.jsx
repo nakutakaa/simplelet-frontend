@@ -2,6 +2,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
 import Layout from "./components/Layout";
+import Navbar from "./components/Navbar"; // <-- Imported Navbar
 import ProtectedRoute from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PageErrorBoundary from "./components/PageErrorBoundary";
@@ -17,7 +18,7 @@ import ListingDetailPage from "./pages/ListingDetailPage";
 import ProfilePage from "./pages/ProfilePage";
 import FavoritesPage from "./pages/FavoritesPage";
 import LocationPermission from "./components/LocationPermission";
-import OnboardingModal from "./components/OnboardingModal"; // <-- Imported Onboarding Modal
+import OnboardingModal from "./components/OnboardingModal";
 import "leaflet/dist/leaflet.css";
 
 function App() {
@@ -175,6 +176,9 @@ function App() {
             />
           </Routes>
         </Layout>
+
+        {/* Global Navigation Bar Component */}
+        <Navbar />
       </BrowserRouter>
     </ErrorBoundary>
   );
