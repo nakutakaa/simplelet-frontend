@@ -1,8 +1,8 @@
-// src/services/api.js
 import axios from "axios";
 
 const getApiUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
+  
   if (envUrl) {
     let url = envUrl.replace(/\/+$/, '');
     if (!url.endsWith('/api')) {
@@ -10,10 +10,12 @@ const getApiUrl = () => {
     }
     return url;
   }
+  
   return '/api';
 };
 
 const API_URL = getApiUrl();
+console.log('🔍 API URL:', API_URL);
 
 const API = axios.create({
   baseURL: API_URL,
@@ -36,7 +38,7 @@ API.interceptors.request.use(
         config.headers['X-User-Latitude'] = latitude;
         config.headers['X-User-Longitude'] = longitude;
       } catch (e) {
-        // ignore
+        // ignore invalid JSON
       }
     }
 
@@ -45,11 +47,12 @@ API.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Interceptor handles status codes without forcing window location redirects for guests
 API.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token if expired/invalid, but DO NOT hard-redirect.
+      // Clear token quietly if expired or invalid
       localStorage.removeItem('token');
       localStorage.removeItem('user');
     }
