@@ -14,9 +14,9 @@ const getOptimizedImageUrl = (url, width = 1000, height = 1200) => {
   return url;
 };
 
-export default function ListingStoriesModal({ listings = [], initialIndex = 0, isOpen, onClose }) {
+export default function ListingStoriesModal({ listings = [], initialIndex = null, isOpen, onClose }) {
   const navigate = useNavigate();
-  const [currentListingIndex, setCurrentListingIndex] = useState(initialIndex);
+  const [currentListingIndex, setCurrentListingIndex] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -25,19 +25,27 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
   const timerRef = useRef(null);
   const STORY_DURATION = 5000;
 
-  // Whenever the modal opens, pick a random starting post if no explicit initialIndex was selected
+  // Handle modal opening logic for both specific card clicks & general "Watch Stories" feed
   useEffect(() => {
     if (isOpen) {
       setCurrentImageIndex(0);
       setProgress(0);
-      if (listings.length > 0) {
+
+      const hasValidInitialIndex = 
+        typeof initialIndex === "number" && 
+        initialIndex >= 0 && 
+        initialIndex < listings.length;
+
+      if (hasValidInitialIndex) {
+        // Specific card clicked: start at that exact index
+        setCurrentListingIndex(initialIndex);
+      } else if (listings.length > 0) {
+        // "Watch Stories" feed clicked: pick a random post to start
         const randomIndex = Math.floor(Math.random() * listings.length);
         setCurrentListingIndex(randomIndex);
-      } else {
-        setCurrentListingIndex(initialIndex);
       }
     }
-  }, [isOpen, listings.length]);
+  }, [isOpen, initialIndex, listings.length]);
 
   const currentListing = listings[currentListingIndex] || null;
   const listingId = currentListing?.id || currentListing?._id;
@@ -104,9 +112,8 @@ export default function ListingStoriesModal({ listings = [], initialIndex = 0, i
       if (currentListingIndex < listings.length - 1) {
         setCurrentListingIndex((prev) => prev + 1);
       } else {
-        // Loop around randomly instead of closing immediately when at the end
-        const nextRandomIndex = Math.floor(Math.random() * listings.length);
-        setCurrentListingIndex(nextRandomIndex);
+        // Loop back to start if reaching the end of the queue
+        setCurrentListingIndex(0);
       }
     }
   };
