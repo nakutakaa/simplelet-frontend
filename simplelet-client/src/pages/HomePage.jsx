@@ -117,24 +117,6 @@ export default function HomePage() {
     }
   };
 
-  const clearFilters = () => {
-    const reset = {
-      search: "",
-      house_type: "",
-      location: "",
-      price_min: "",
-      price_max: "",
-      sort_by: "newest",
-      nearby: "",
-    };
-    setSearchInput("");
-    setFilters(reset);
-    setActiveFilters(reset);
-    setShowNearby(false);
-    setUserLocation(null);
-    updateURL(reset);
-  };
-
   const getUserLocation = () => {
     setIsGettingLocation(true);
     if (navigator.geolocation) {
@@ -329,7 +311,7 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={() => handleOpenStories(0)}
-                className="text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-xl transition flex items-center gap-2"
+                className="text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-xl transition flex items-center gap-2 shadow-lg shadow-blue-500/20"
               >
                 <span>Watch All Stories ({randomizedListings.length})</span>
               </button>
@@ -338,18 +320,23 @@ export default function HomePage() {
         </form>
       </div>
 
-      {/* WhatsApp Status Avatar Strip / Stories Entry Feed */}
+      {/* Enlarged WhatsApp Status Avatar Strip / Stories Entry Feed */}
       {randomizedListings.length === 0 ? (
         <div className="text-center py-12 bg-black/90 backdrop-blur-md rounded-2xl border border-white/10">
           <p className="text-gray-400 text-sm">No property stories available right now.</p>
         </div>
       ) : (
-        <div className="bg-black/80 backdrop-blur-md rounded-2xl border border-white/10 p-4 space-y-4">
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-blue-400">
-            Property Status Feed (Tap to view)
-          </h3>
+        <div className="bg-black/80 backdrop-blur-md rounded-2xl border border-white/10 p-4 sm:p-5 space-y-4 shadow-xl">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xs uppercase tracking-wider font-bold text-blue-400">
+              Property Status Feed (Tap to view)
+            </h3>
+            <span className="text-[11px] text-gray-400">
+              {randomizedListings.length} {randomizedListings.length === 1 ? "Listing" : "Listings"}
+            </span>
+          </div>
 
-          <div className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-none">
+          <div className="flex items-start gap-4 sm:gap-6 overflow-x-auto pb-3 pt-1 scrollbar-none">
             {randomizedListings.map((listing, index) => {
               const cover =
                 listing.cover_image ||
@@ -360,22 +347,37 @@ export default function HomePage() {
                 <div
                   key={listing.id}
                   onClick={() => handleOpenStories(index)}
-                  className="flex flex-col items-center gap-1.5 min-w-[76px] cursor-pointer group"
+                  className="flex flex-col items-center gap-2 min-w-[80px] sm:min-w-[96px] cursor-pointer group transition-transform duration-200 hover:scale-105"
                 >
-                  <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-blue-600 to-sky-400 group-hover:scale-105 transition-transform">
-                    <div className="w-full h-full rounded-full overflow-hidden bg-[#121212] border-2 border-black">
+                  {/* Larger Outer Gradient Ring */}
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full p-[3px] bg-gradient-to-tr from-blue-600 via-sky-400 to-indigo-500 shadow-md group-hover:shadow-blue-500/40 relative">
+                    {/* Inner Circle Image Container */}
+                    <div className="w-full h-full rounded-full overflow-hidden bg-[#121212] border-2 border-black relative">
                       {cover ? (
-                        <img src={cover} alt={listing.title} className="w-full h-full object-cover" />
+                        <img
+                          src={cover}
+                          alt={listing.title}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                        />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-500">
+                        <div className="w-full h-full flex items-center justify-center text-xs font-semibold text-gray-500 bg-gray-900">
                           House
                         </div>
                       )}
                     </div>
                   </div>
-                  <span className="text-[11px] text-gray-300 font-medium line-clamp-1 text-center w-16">
-                    {listing.title}
-                  </span>
+
+                  {/* Title & Price Label */}
+                  <div className="flex flex-col items-center w-20 sm:w-24 text-center">
+                    <span className="text-xs text-gray-200 font-semibold line-clamp-1 group-hover:text-blue-400 transition-colors">
+                      {listing.title}
+                    </span>
+                    {listing.price && (
+                      <span className="text-[10px] text-gray-400 font-medium">
+                        KSh {Number(listing.price).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
