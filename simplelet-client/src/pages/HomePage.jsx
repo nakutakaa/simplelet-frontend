@@ -1,5 +1,5 @@
 // src/pages/HomePage.jsx
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import API from "../services/api";
@@ -79,13 +79,6 @@ export default function HomePage() {
   const currentUser = JSON.parse(localStorage.getItem("user") || "null");
   const userId = currentUser?.id || currentUser?.user_id || null;
 
-  const { newListings = [] } = useRealTimeListings(null, userId, activeFilters);
-
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["listings", activeFilters],
-    queryFn: () => fetchListings(activeFilters),
-  });
-
   const updateURL = useCallback((paramsToUpdate) => {
     const params = new URLSearchParams();
     Object.entries(paramsToUpdate).forEach(([key, value]) => {
@@ -94,15 +87,34 @@ export default function HomePage() {
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
 
-  const executeSearch = () => {
-    const newActive = { ...filters, search: searchInput };
-    setActiveFilters(newActive);
-    updateURL(newActive);
-  };
+  // Debounce search input typing to trigger soft background updates
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setActiveFilters((prev) => {
+        if (prev.search === searchInput) return prev;
+        const newActive = { ...prev, search: searchInput };
+        updateURL(newActive);
+        return newActive;
+      });
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchInput, updateURL]);
+
+  const { newListings = [] } = useRealTimeListings(null, userId, activeFilters);
+
+  // TanStack Query with placeholderData keeps existing UI mounted while fetching in background
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
+    queryKey: ["listings", activeFilters],
+    queryFn: () => fetchListings(activeFilters),
+    placeholderData: (previousData) => previousData,
+  });
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    executeSearch();
+    const newActive = { ...filters, search: searchInput };
+    setActiveFilters(newActive);
+    updateURL(newActive);
   };
 
   const handleFilterChange = (e) => {
@@ -111,7 +123,7 @@ export default function HomePage() {
     setFilters(updatedFilters);
 
     if (name === "house_type" || name === "sort_by") {
-      const newActive = { ...updatedFilters, search: activeFilters.search };
+      const newActive = { ...updatedFilters, search: searchInput };
       setActiveFilters(newActive);
       updateURL(newActive);
     }
@@ -130,7 +142,7 @@ export default function HomePage() {
           const updatedFilters = { ...filters, nearby: coordsString, sort_by: "distance" };
           setFilters(updatedFilters);
 
-          const newActive = { ...updatedFilters, search: activeFilters.search };
+          const newActive = { ...updatedFilters, search: searchInput };
           setActiveFilters(newActive);
           updateURL(newActive);
           toast.success("Location found! Showing nearby listings.");
@@ -160,7 +172,6 @@ export default function HomePage() {
 
   const rawListings = Array.from(uniqueListingsMap.values());
 
-  // Randomizes listings so story order changes on refresh/load
   const randomizedListings = useMemo(() => {
     return shuffleArray(rawListings);
   }, [rawListings.length]);
@@ -204,15 +215,23 @@ export default function HomePage() {
 
         <form onSubmit={handleSearchSubmit} className="space-y-3">
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-            <input
-              ref={searchInputRef}
-              type="text"
-              name="search"
-              placeholder="Search properties, areas..."
-              className="flex-1 input text-sm"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
+            <div className="relative flex-1">
+              <input
+                ref={searchInputRef}
+                type="text"
+                name="search"
+                placeholder="Search properties, areas..."
+                className="w-full input text-sm pr-8"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+              {isFetching && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <button type="submit" className="btn-primary flex-1 sm:flex-none text-sm py-2 px-4">
                 Search
@@ -320,7 +339,7 @@ export default function HomePage() {
         </form>
       </div>
 
-      {/* Enlarged WhatsApp Status Avatar Strip / Stories Entry Feed */}
+      {/* Stories Entry Feed */}
       {randomizedListings.length === 0 ? (
         <div className="text-center py-12 bg-black/90 backdrop-blur-md rounded-2xl border border-white/10">
           <p className="text-gray-400 text-sm">No property stories available right now.</p>
@@ -349,9 +368,7 @@ export default function HomePage() {
                   onClick={() => handleOpenStories(index)}
                   className="flex flex-col items-center gap-2 min-w-[80px] sm:min-w-[96px] cursor-pointer group transition-transform duration-200 hover:scale-105"
                 >
-                  {/* Larger Outer Gradient Ring */}
                   <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full p-[3px] bg-gradient-to-tr from-blue-600 via-sky-400 to-indigo-500 shadow-md group-hover:shadow-blue-500/40 relative">
-                    {/* Inner Circle Image Container */}
                     <div className="w-full h-full rounded-full overflow-hidden bg-[#121212] border-2 border-black relative">
                       {cover ? (
                         <img
@@ -367,7 +384,6 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  {/* Title & Price Label */}
                   <div className="flex flex-col items-center w-20 sm:w-24 text-center">
                     <span className="text-xs text-gray-200 font-semibold line-clamp-1 group-hover:text-blue-400 transition-colors">
                       {listing.title}
