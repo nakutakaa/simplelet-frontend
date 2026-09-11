@@ -48,21 +48,11 @@ export default function HomePage() {
   const searchInputRef = useRef(null);
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [searchInput, setSearchInput] = useState(() => searchParams.get("search") || "");
-
   const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);
   const [isStoryModalOpen, setIsStoryModalOpen] = useState(false);
 
+  // Form input state (drives live inputs)
   const [filters, setFilters] = useState(() => ({
-    house_type: searchParams.get("house_type") || "",
-    location: searchParams.get("location") || "",
-    price_min: searchParams.get("price_min") || "",
-    price_max: searchParams.get("price_max") || "",
-    sort_by: searchParams.get("sort_by") || "newest",
-    nearby: searchParams.get("nearby") || "",
-  }));
-
-  const [activeFilters, setActiveFilters] = useState(() => ({
     search: searchParams.get("search") || "",
     house_type: searchParams.get("house_type") || "",
     location: searchParams.get("location") || "",
@@ -71,6 +61,9 @@ export default function HomePage() {
     sort_by: searchParams.get("sort_by") || "newest",
     nearby: searchParams.get("nearby") || "",
   }));
+
+  // Active query parameters used exclusively for TanStack Query requests
+  const [activeFilters, setActiveFilters] = useState(filters);
 
   const [userLocation, setUserLocation] = useState(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
@@ -87,23 +80,19 @@ export default function HomePage() {
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
 
-  // Debounce search input typing to trigger soft background updates
+  // Unified debounce: applies text changes softly to activeFilters after 350ms pause
   useEffect(() => {
     const timer = setTimeout(() => {
-      setActiveFilters((prev) => {
-        if (prev.search === searchInput) return prev;
-        const newActive = { ...prev, search: searchInput };
-        updateURL(newActive);
-        return newActive;
-      });
+      setActiveFilters(filters);
+      updateURL(filters);
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [searchInput, updateURL]);
+  }, [filters, updateURL]);
 
   const { newListings = [] } = useRealTimeListings(null, userId, activeFilters);
 
-  // TanStack Query with placeholderData keeps existing UI mounted while fetching in background
+  // TanStack Query soft background updates
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["listings", activeFilters],
     queryFn: () => fetchListings(activeFilters),
@@ -112,21 +101,14 @@ export default function HomePage() {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    const newActive = { ...filters, search: searchInput };
-    setActiveFilters(newActive);
-    updateURL(newActive);
+    // Instant submission on Enter or button click
+    setActiveFilters(filters);
+    updateURL(filters);
   };
 
-  const handleFilterChange = (e) => {
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
-    const updatedFilters = { ...filters, [name]: value };
-    setFilters(updatedFilters);
-
-    if (name === "house_type" || name === "sort_by") {
-      const newActive = { ...updatedFilters, search: searchInput };
-      setActiveFilters(newActive);
-      updateURL(newActive);
-    }
+    setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
   const getUserLocation = () => {
@@ -141,15 +123,14 @@ export default function HomePage() {
 
           const updatedFilters = { ...filters, nearby: coordsString, sort_by: "distance" };
           setFilters(updatedFilters);
-
-          const newActive = { ...updatedFilters, search: searchInput };
-          setActiveFilters(newActive);
-          updateURL(newActive);
+          setActiveFilters(updatedFilters);
+          updateURL(updatedFilters);
+          
           toast.success("Location found! Showing nearby listings.");
           setIsGettingLocation(false);
         },
-        (error) => {
-          console.error("Geolocation error:", error);
+        (err) => {
+          console.error("Geolocation error:", err);
           toast.error("Could not get your location.");
           setIsGettingLocation(false);
         },
@@ -222,8 +203,8 @@ export default function HomePage() {
                 name="search"
                 placeholder="Search properties, areas..."
                 className="w-full input text-sm pr-8"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                value={filters.search}
+                onChange={handleInputChange}
               />
               {isFetching && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -252,7 +233,7 @@ export default function HomePage() {
               <select
                 name="house_type"
                 value={filters.house_type}
-                onChange={handleFilterChange}
+                onChange={handleInputChange}
                 className="input text-xs sm:text-sm"
               >
                 {HOUSE_TYPES.map((type) => (
@@ -267,7 +248,7 @@ export default function HomePage() {
                 type="text"
                 name="location"
                 value={filters.location}
-                onChange={handleFilterChange}
+                onChange={handleInputChange}
                 placeholder="e.g., Kilimani"
                 className="input text-xs sm:text-sm"
               />
@@ -279,7 +260,7 @@ export default function HomePage() {
                 type="number"
                 name="price_min"
                 value={filters.price_min}
-                onChange={handleFilterChange}
+                onChange={handleInputChange}
                 placeholder="0"
                 className="input text-xs sm:text-sm"
               />
@@ -291,7 +272,7 @@ export default function HomePage() {
                 type="number"
                 name="price_max"
                 value={filters.price_max}
-                onChange={handleFilterChange}
+                onChange={handleInputChange}
                 placeholder="100000"
                 className="input text-xs sm:text-sm"
               />
@@ -302,7 +283,7 @@ export default function HomePage() {
               <select
                 name="sort_by"
                 value={filters.sort_by}
-                onChange={handleFilterChange}
+                onChange={handleInputChange}
                 className="input text-xs sm:text-sm"
               >
                 {SORT_OPTIONS.map((option) => (
@@ -317,13 +298,14 @@ export default function HomePage() {
               type="button"
               onClick={getUserLocation}
               disabled={isGettingLocation}
-              className={`text-xs px-3 py-1.5 rounded-xl transition ${
+              className={`text-xs px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 ${
                 showNearby
                   ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
                   : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"
               }`}
             >
               {isGettingLocation ? "Getting location..." : showNearby ? "Nearby mode ON" : "Show Nearby"}
+              {isFetching && <span className="animate-pulse text-blue-400">•</span>}
             </button>
 
             {randomizedListings.length > 0 && (
