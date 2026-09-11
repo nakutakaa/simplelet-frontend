@@ -1,4 +1,3 @@
-// src/components/ListingStoriesModal.jsx
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -11,6 +10,7 @@ import {
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
 import API from "../services/api";
+import AuthPromptModal from "./AuthPromptModal";
 
 const getOptimizedImageUrl = (url, width = 1000, height = 1200) => {
   if (!url) return "";
@@ -58,6 +58,7 @@ export default function ListingStoriesModal({
   const [isPaused, setIsPaused] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Refs for stable interval access
   const timerRef = useRef(null);
@@ -139,7 +140,7 @@ export default function ListingStoriesModal({
     checkFavorite();
   }, [listingId, isLoggedIn]);
 
-  // ============ STABLE NEXT/PREV HANDLERS (useCallback) ============
+  // ============ STABLE NEXT/PREV HANDLERS ============
   const handleNextSlide = useCallback(() => {
     const queue = storyQueueRef.current;
     const listingIdx = currentListingIndexRef.current;
@@ -174,9 +175,12 @@ export default function ListingStoriesModal({
     }
   }, []);
 
+  // Pause timer when Auth Modal is visible
+  const isTimerActive = isOpen && !isPaused && !isLoading && !showAuthModal;
+
   // ============ PROGRESS TIMER ============
   useEffect(() => {
-    if (!isOpen || isPaused || isLoading) {
+    if (!isTimerActive) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -204,7 +208,7 @@ export default function ListingStoriesModal({
         timerRef.current = null;
       }
     };
-  }, [isOpen, isPaused, isLoading, currentImageIndex, currentListingIndex, handleNextSlide]);
+  }, [isTimerActive, currentImageIndex, currentListingIndex, handleNextSlide]);
 
   // ============ CLEANUP ON UNMOUNT ============
   useEffect(() => {
@@ -216,7 +220,7 @@ export default function ListingStoriesModal({
 
   // ============ KEYBOARD NAVIGATION ============
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || showAuthModal) return;
 
     const handleKeyDown = (e) => {
       if (e.key === "ArrowLeft") handlePrevSlide();
@@ -230,9 +234,9 @@ export default function ListingStoriesModal({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, handleNextSlide, handlePrevSlide, onClose]);
+  }, [isOpen, showAuthModal, handleNextSlide, handlePrevSlide, onClose]);
 
-  // ============ PAUSE HANDLERS (with debounce) ============
+  // ============ PAUSE HANDLERS ============
   const handlePauseStart = () => {
     if (pauseTimeoutRef.current) clearTimeout(pauseTimeoutRef.current);
     setIsPaused(true);
@@ -268,9 +272,8 @@ export default function ListingStoriesModal({
   const toggleFavorite = async (e) => {
     e.stopPropagation();
     if (!isLoggedIn) {
-      toast.error("Please login to save listings");
-      onClose();
-      navigate("/login");
+      setIsPaused(true);
+      setShowAuthModal(true);
       return;
     }
     if (!listingId) return;
@@ -320,164 +323,177 @@ export default function ListingStoriesModal({
   const currentCover = hasImages ? images[currentImageIndex] : "";
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center sm:p-4">
-      {/* Background Blur */}
-      {currentCover && (
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-30 blur-2xl pointer-events-none scale-110"
-          style={{ backgroundImage: `url(${currentCover})` }}
-        />
-      )}
+    <>
+      <div className="fixed inset-0 z-50 bg-black flex items-center justify-center sm:p-4">
+        {/* Background Blur */}
+        {currentCover && (
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-30 blur-2xl pointer-events-none scale-110"
+            style={{ backgroundImage: `url(${currentCover})` }}
+          />
+        )}
 
-      {/* Main Container Frame */}
-      <div className="relative w-full max-w-md h-full sm:h-[90vh] sm:rounded-3xl bg-[#0a0a0a] overflow-hidden flex flex-col justify-between border border-white/10 shadow-2xl z-10">
-        {/* Top Progress Segment Bars */}
-        <div className="absolute top-0 inset-x-0 z-30 p-3 bg-gradient-to-b from-black/90 via-black/50 to-transparent space-y-2">
-          <div className="flex items-center gap-1.5 w-full">
-            {hasImages ? (
-              images.map((_, idx) => {
-                let barWidth = "0%";
-                if (idx < currentImageIndex) barWidth = "100%";
-                else if (idx === currentImageIndex) barWidth = `${progress}%`;
+        {/* Main Container Frame */}
+        <div className="relative w-full max-w-md h-full sm:h-[90vh] sm:rounded-3xl bg-[#0a0a0a] overflow-hidden flex flex-col justify-between border border-white/10 shadow-2xl z-10">
+          {/* Top Progress Segment Bars */}
+          <div className="absolute top-0 inset-x-0 z-30 p-3 bg-gradient-to-b from-black/90 via-black/50 to-transparent space-y-2">
+            <div className="flex items-center gap-1.5 w-full">
+              {hasImages ? (
+                images.map((_, idx) => {
+                  let barWidth = "0%";
+                  if (idx < currentImageIndex) barWidth = "100%";
+                  else if (idx === currentImageIndex) barWidth = `${progress}%`;
 
-                return (
-                  <div
-                    key={idx}
-                    className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden"
-                  >
+                  return (
                     <div
-                      className="h-full bg-blue-500 transition-all duration-75 ease-linear"
-                      style={{ width: barWidth }}
-                    />
-                  </div>
-                );
-              })
+                      key={idx}
+                      className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden"
+                    >
+                      <div
+                        className="h-full bg-blue-500 transition-all duration-75 ease-linear"
+                        style={{ width: barWidth }}
+                      />
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="w-full h-1 bg-blue-500 rounded-full" />
+              )}
+            </div>
+
+            {/* Header Bar */}
+            <div className="flex items-center justify-between text-white pt-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-400">
+                {currentListing.house_type_display || "PROPERTY"}
+              </span>
+
+              <button
+                onClick={onClose}
+                className="p-1 rounded-full bg-black/40 hover:bg-black/60 text-white transition cursor-pointer"
+                aria-label="Close stories"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+
+          {/* Story Screen Media Viewport */}
+          <div
+            onClick={handleTapOverlay}
+            onMouseDown={handlePauseStart}
+            onMouseUp={handlePauseEnd}
+            onMouseLeave={handlePauseEnd}
+            onTouchStart={handlePauseStart}
+            onTouchEnd={handlePauseEnd}
+            className="relative flex-1 w-full h-full bg-[#0a0a0a] flex items-center justify-center cursor-pointer select-none"
+          >
+            {hasImages ? (
+              <img
+                src={getOptimizedImageUrl(currentCover)}
+                alt={currentListing.title}
+                className="w-full h-full object-cover"
+                draggable={false}
+              />
             ) : (
-              <div className="w-full h-1 bg-blue-500 rounded-full" />
+              <div className="text-gray-500 text-sm">No Images Available</div>
+            )}
+
+            {/* Nav Buttons for Desktop */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrevSlide();
+              }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/70 text-white hidden sm:block transition cursor-pointer"
+              aria-label="Previous"
+            >
+              <ChevronLeftIcon className="w-6 h-6" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNextSlide();
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/70 text-white hidden sm:block transition cursor-pointer"
+              aria-label="Next"
+            >
+              <ChevronRightIcon className="w-6 h-6" />
+            </button>
+
+            {/* Paused Indicator */}
+            {isPaused && !showAuthModal && (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/60 rounded-full p-4">
+                <div className="w-8 h-8 flex items-center justify-center text-white text-2xl">
+                  ⏸
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Header Bar */}
-          <div className="flex items-center justify-between text-white pt-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-400">
-              {currentListing.house_type_display || "PROPERTY"}
-            </span>
-
-            <button
-              onClick={onClose}
-              className="p-1 rounded-full bg-black/40 hover:bg-black/60 text-white transition"
-              aria-label="Close stories"
-            >
-              <XMarkIcon className="w-6 h-6" />
-            </button>
-          </div>
-        </div>
-
-        {/* Story Screen Media Viewport */}
-        <div
-          onClick={handleTapOverlay}
-          onMouseDown={handlePauseStart}
-          onMouseUp={handlePauseEnd}
-          onMouseLeave={handlePauseEnd}
-          onTouchStart={handlePauseStart}
-          onTouchEnd={handlePauseEnd}
-          className="relative flex-1 w-full h-full bg-[#0a0a0a] flex items-center justify-center cursor-pointer select-none"
-        >
-          {hasImages ? (
-            <img
-              src={getOptimizedImageUrl(currentCover)}
-              alt={currentListing.title}
-              className="w-full h-full object-cover"
-              draggable={false}
-            />
-          ) : (
-            <div className="text-gray-500 text-sm">No Images Available</div>
-          )}
-
-          {/* Nav Buttons for Desktop */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handlePrevSlide();
-            }}
-            className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/70 text-white hidden sm:block transition"
-            aria-label="Previous"
-          >
-            <ChevronLeftIcon className="w-6 h-6" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleNextSlide();
-            }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/70 text-white hidden sm:block transition"
-            aria-label="Next"
-          >
-            <ChevronRightIcon className="w-6 h-6" />
-          </button>
-
-          {/* Paused Indicator */}
-          {isPaused && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/60 rounded-full p-4">
-              <div className="w-8 h-8 flex items-center justify-center text-white text-2xl">
-                ⏸
+          {/* Bottom Property Banner */}
+          <div className="absolute bottom-0 inset-x-0 z-30 p-5 bg-gradient-to-t from-black via-black/90 to-transparent space-y-4">
+            <div className="space-y-1">
+              <div className="flex justify-between items-baseline">
+                <h2 className="text-xl font-bold text-white line-clamp-1">
+                  {currentListing.title}
+                </h2>
+                <span className="text-xl font-black text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text">
+                  KSh {currentListing.price?.toLocaleString()}
+                </span>
               </div>
+              <p className="text-xs text-gray-300">📍 {currentListing.location}</p>
             </div>
-          )}
-        </div>
 
-        {/* Bottom Property Banner */}
-        <div className="absolute bottom-0 inset-x-0 z-30 p-5 bg-gradient-to-t from-black via-black/90 to-transparent space-y-4">
-          <div className="space-y-1">
-            <div className="flex justify-between items-baseline">
-              <h2 className="text-xl font-bold text-white line-clamp-1">
-                {currentListing.title}
-              </h2>
-              <span className="text-xl font-black text-transparent bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text">
-                KSh {currentListing.price?.toLocaleString()}
-              </span>
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleViewDetails}
+                className="flex-1 text-center py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition cursor-pointer"
+              >
+                View Full Details
+              </button>
+
+              <button
+                onClick={toggleFavorite}
+                className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/10 transition cursor-pointer"
+                aria-label="Favorite"
+              >
+                {isFavorited ? (
+                  <HeartSolidIcon className="w-5 h-5 text-blue-500" />
+                ) : (
+                  <HeartIcon className="w-5 h-5 text-gray-300" />
+                )}
+              </button>
+
+              <button
+                onClick={handleShare}
+                className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/10 transition cursor-pointer"
+                aria-label="Share"
+              >
+                <ShareIcon className="w-5 h-5 text-gray-300" />
+              </button>
             </div>
-            <p className="text-xs text-gray-300">📍 {currentListing.location}</p>
-          </div>
 
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              type="button"
-              onClick={handleViewDetails}
-              className="flex-1 text-center py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition cursor-pointer"
-            >
-              View Full Details
-            </button>
-
-            <button
-              onClick={toggleFavorite}
-              className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/10 transition"
-              aria-label="Favorite"
-            >
-              {isFavorited ? (
-                <HeartSolidIcon className="w-5 h-5 text-blue-500" />
-              ) : (
-                <HeartIcon className="w-5 h-5 text-gray-300" />
-              )}
-            </button>
-
-            <button
-              onClick={handleShare}
-              className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/10 transition"
-              aria-label="Share"
-            >
-              <ShareIcon className="w-5 h-5 text-gray-300" />
-            </button>
-          </div>
-
-          <div className="text-center pt-1">
-            <p className="text-[10px] text-gray-400 font-medium tracking-wide">
-              Property {currentListingIndex + 1} of {storyQueue.length} • Tap
-              left/right to browse
-            </p>
+            <div className="text-center pt-1">
+              <p className="text-[10px] text-gray-400 font-medium tracking-wide">
+                Property {currentListingIndex + 1} of {storyQueue.length} • Tap
+                left/right to browse
+              </p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Embedded Auth Prompt Modal */}
+      <AuthPromptModal
+        isOpen={showAuthModal}
+        onClose={() => {
+          setShowAuthModal(false);
+          setIsPaused(false);
+        }}
+        title="Save Your Favorite Properties"
+        message="Log in or create an account to save properties and access them anytime."
+      />
+    </>
   );
 }
