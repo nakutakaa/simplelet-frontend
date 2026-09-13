@@ -38,16 +38,15 @@ const shuffleArray = (array) => {
   return shuffled;
 };
 
+// Safe fetch wrapper: NEVER throw an uncaught error on search requests
 const fetchListings = async (params) => {
   try {
     const { data } = await API.get("/listings", { params });
     return data;
   } catch (err) {
-    // If backend returns 404 for no matching search, return empty array safely
-    if (err.response && err.response.status === 404) {
-      return [];
-    }
-    throw err;
+    // Return an empty payload for ANY error during search query execution
+    // to prevent component crash and input focus loss
+    return [];
   }
 };
 
@@ -89,23 +88,23 @@ export default function HomePage() {
     [setSearchParams]
   );
 
-  // Smooth debounce syncs inputs to search query seamlessly
+  // Debounced API sync: prevents intermediate backspacing keypresses from spamming requests
   useEffect(() => {
     const timer = setTimeout(() => {
       setActiveFilters(filters);
       updateURL(filters);
-    }, 400);
+    }, 350);
 
     return () => clearTimeout(timer);
   }, [filters, updateURL]);
 
   const { newListings = [] } = useRealTimeListings(null, userId, activeFilters);
 
-  const { data, isLoading, isFetching, isError, refetch } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["listings", activeFilters],
     queryFn: () => fetchListings(activeFilters),
     placeholderData: (previousData) => previousData,
-    retry: 1,
+    retry: false,
   });
 
   const handleSearchSubmit = (e) => {
@@ -118,6 +117,24 @@ export default function HomePage() {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // NATIVE KEYBOARD FIX:
+  // Automatically clear the search term if backspace is pressed when 1 character remains,
+  // or instantly reset state on Escape.
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "Backspace" && filters.search.length <= 1) {
+      e.preventDefault();
+      const resetFilters = { ...filters, search: "" };
+      setFilters(resetFilters);
+      setActiveFilters(resetFilters);
+      updateURL(resetFilters);
+    } else if (e.key === "Escape") {
+      const resetFilters = { ...filters, search: "" };
+      setFilters(resetFilters);
+      setActiveFilters(resetFilters);
+      updateURL(resetFilters);
+    }
   };
 
   const handleClearSearch = () => {
@@ -214,7 +231,7 @@ export default function HomePage() {
                 className="w-full input text-base sm:text-sm pr-20"
                 value={filters.search}
                 onChange={handleInputChange}
-                onKeyDown={(e) => e.key === "Escape" && handleClearSearch()}
+                onKeyDown={handleSearchKeyDown}
               />
 
               {/* Loading indicator */}
@@ -224,7 +241,7 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* Clear button */}
+              {/* Clear button kept for optional tap */}
               {hasSearchText && (
                 <button
                   type="button"
@@ -365,18 +382,6 @@ export default function HomePage() {
       {isLoading ? (
         <div className="flex justify-center items-center h-48 bg-black/80 backdrop-blur-md rounded-2xl border border-white/10">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
-        </div>
-      ) : isError ? (
-        <div className="text-center py-8 bg-black/80 backdrop-blur-md rounded-2xl border border-white/10 space-y-3">
-          <p className="text-red-400 text-sm">
-            Failed to load listings. Please try again.
-          </p>
-          <button
-            onClick={() => refetch()}
-            className="btn-primary text-xs py-1.5 px-3"
-          >
-            Retry Search
-          </button>
         </div>
       ) : randomizedListings.length === 0 ? (
         <div className="text-center py-12 bg-black/90 backdrop-blur-md rounded-2xl border border-white/10">
