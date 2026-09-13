@@ -39,8 +39,16 @@ const shuffleArray = (array) => {
 };
 
 const fetchListings = async (params) => {
-  const { data } = await API.get("/listings", { params });
-  return data;
+  try {
+    const { data } = await API.get("/listings", { params });
+    return data;
+  } catch (err) {
+    // If backend returns 404 for empty search, treat it as empty list rather than crashing
+    if (err.response && err.response.status === 404) {
+      return [];
+    }
+    throw err;
+  }
 };
 
 export default function HomePage() {
@@ -51,7 +59,6 @@ export default function HomePage() {
   const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);
   const [isStoryModalOpen, setIsStoryModalOpen] = useState(false);
 
-  // Form input state (drives live inputs)
   const [filters, setFilters] = useState(() => ({
     search: searchParams.get("search") || "",
     house_type: searchParams.get("house_type") || "",
@@ -62,7 +69,6 @@ export default function HomePage() {
     nearby: searchParams.get("nearby") || "",
   }));
 
-  // Active query parameters used exclusively for TanStack Query requests
   const [activeFilters, setActiveFilters] = useState(filters);
 
   const [userLocation, setUserLocation] = useState(null);
@@ -80,7 +86,7 @@ export default function HomePage() {
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
 
-  // Unified debounce: applies text changes softly to activeFilters after 350ms pause
+  // Soft background debounce update
   useEffect(() => {
     const timer = setTimeout(() => {
       setActiveFilters(filters);
@@ -92,16 +98,15 @@ export default function HomePage() {
 
   const { newListings = [] } = useRealTimeListings(null, userId, activeFilters);
 
-  // TanStack Query soft background updates
-  const { data, isLoading, isFetching, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["listings", activeFilters],
     queryFn: () => fetchListings(activeFilters),
     placeholderData: (previousData) => previousData,
+    retry: 1,
   });
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    // Instant submission on Enter or button click
     setActiveFilters(filters);
     updateURL(filters);
   };
@@ -163,25 +168,6 @@ export default function HomePage() {
     setIsStoryModalOpen(true);
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-red-400 text-sm sm:text-base">Failed to load listings. Please try again.</p>
-        <button onClick={() => refetch()} className="btn-primary mt-4 text-sm">
-          Retry
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div
       className="min-h-screen bg-cover bg-center bg-no-repeat bg-fixed space-y-4 sm:space-y-6 rounded-2xl p-2 sm:p-6 lg:p-8"
@@ -202,7 +188,8 @@ export default function HomePage() {
                 type="text"
                 name="search"
                 placeholder="Search properties, areas..."
-                className="w-full input text-sm pr-8"
+                /* text-base prevents iOS Safari from zooming in on input tap */
+                className="w-full input text-base sm:text-sm pr-8"
                 value={filters.search}
                 onChange={handleInputChange}
               />
@@ -234,7 +221,7 @@ export default function HomePage() {
                 name="house_type"
                 value={filters.house_type}
                 onChange={handleInputChange}
-                className="input text-xs sm:text-sm"
+                className="input text-base sm:text-sm"
               >
                 {HOUSE_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>{type.label}</option>
@@ -250,7 +237,7 @@ export default function HomePage() {
                 value={filters.location}
                 onChange={handleInputChange}
                 placeholder="e.g., Kilimani"
-                className="input text-xs sm:text-sm"
+                className="input text-base sm:text-sm"
               />
             </div>
 
@@ -262,7 +249,7 @@ export default function HomePage() {
                 value={filters.price_min}
                 onChange={handleInputChange}
                 placeholder="0"
-                className="input text-xs sm:text-sm"
+                className="input text-base sm:text-sm"
               />
             </div>
 
@@ -274,7 +261,7 @@ export default function HomePage() {
                 value={filters.price_max}
                 onChange={handleInputChange}
                 placeholder="100000"
-                className="input text-xs sm:text-sm"
+                className="input text-base sm:text-sm"
               />
             </div>
 
@@ -284,7 +271,7 @@ export default function HomePage() {
                 name="sort_by"
                 value={filters.sort_by}
                 onChange={handleInputChange}
-                className="input text-xs sm:text-sm"
+                className="input text-base sm:text-sm"
               >
                 {SORT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -321,10 +308,21 @@ export default function HomePage() {
         </form>
       </div>
 
-      {/* Stories Entry Feed */}
-      {randomizedListings.length === 0 ? (
+      {/* Stories Entry Feed Area */}
+      {isLoading ? (
+        <div className="flex justify-center items-center h-48 bg-black/80 backdrop-blur-md rounded-2xl border border-white/10">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+        </div>
+      ) : isError ? (
+        <div className="text-center py-8 bg-black/80 backdrop-blur-md rounded-2xl border border-white/10 space-y-3">
+          <p className="text-red-400 text-sm">Failed to load listings. Please try again.</p>
+          <button onClick={() => refetch()} className="btn-primary text-xs py-1.5 px-3">
+            Retry Search
+          </button>
+        </div>
+      ) : randomizedListings.length === 0 ? (
         <div className="text-center py-12 bg-black/90 backdrop-blur-md rounded-2xl border border-white/10">
-          <p className="text-gray-400 text-sm">No property stories available right now.</p>
+          <p className="text-gray-400 text-sm">No property listings found matching your search.</p>
         </div>
       ) : (
         <div className="bg-black/80 backdrop-blur-md rounded-2xl border border-white/10 p-4 sm:p-5 space-y-4 shadow-xl">
