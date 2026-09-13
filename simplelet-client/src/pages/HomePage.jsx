@@ -43,7 +43,7 @@ const fetchListings = async (params) => {
     const { data } = await API.get("/listings", { params });
     return data;
   } catch (err) {
-    // If backend returns 404 for empty search, treat it as empty list rather than crashing
+    // If backend returns 404 for no matching search, return empty array safely
     if (err.response && err.response.status === 404) {
       return [];
     }
@@ -78,20 +78,23 @@ export default function HomePage() {
   const currentUser = JSON.parse(localStorage.getItem("user") || "null");
   const userId = currentUser?.id || currentUser?.user_id || null;
 
-  const updateURL = useCallback((paramsToUpdate) => {
-    const params = new URLSearchParams();
-    Object.entries(paramsToUpdate).forEach(([key, value]) => {
-      if (value) params.set(key, value);
-    });
-    setSearchParams(params, { replace: true });
-  }, [setSearchParams]);
+  const updateURL = useCallback(
+    (paramsToUpdate) => {
+      const params = new URLSearchParams();
+      Object.entries(paramsToUpdate).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+      });
+      setSearchParams(params, { replace: true });
+    },
+    [setSearchParams]
+  );
 
-  // Soft background debounce update
+  // Smooth debounce syncs inputs to search query seamlessly
   useEffect(() => {
     const timer = setTimeout(() => {
       setActiveFilters(filters);
       updateURL(filters);
-    }, 350);
+    }, 400);
 
     return () => clearTimeout(timer);
   }, [filters, updateURL]);
@@ -109,11 +112,20 @@ export default function HomePage() {
     e.preventDefault();
     setActiveFilters(filters);
     updateURL(filters);
+    if (searchInputRef.current) searchInputRef.current.blur();
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleClearSearch = () => {
+    const updatedFilters = { ...filters, search: "" };
+    setFilters(updatedFilters);
+    setActiveFilters(updatedFilters);
+    updateURL(updatedFilters);
+    if (searchInputRef.current) searchInputRef.current.focus();
   };
 
   const getUserLocation = () => {
@@ -126,11 +138,15 @@ export default function HomePage() {
           setUserLocation({ lat: latitude, lng: longitude });
           setShowNearby(true);
 
-          const updatedFilters = { ...filters, nearby: coordsString, sort_by: "distance" };
+          const updatedFilters = {
+            ...filters,
+            nearby: coordsString,
+            sort_by: "distance",
+          };
           setFilters(updatedFilters);
           setActiveFilters(updatedFilters);
           updateURL(updatedFilters);
-          
+
           toast.success("Location found! Showing nearby listings.");
           setIsGettingLocation(false);
         },
@@ -147,7 +163,10 @@ export default function HomePage() {
     }
   };
 
-  const rawData = Array.isArray(data) ? data : data?.data || data?.listings || [];
+  const rawData = Array.isArray(data)
+    ? data
+    : data?.data || data?.listings || [];
+
   const allListings = [...newListings, ...rawData];
   const uniqueListingsMap = new Map();
   allListings.forEach((listing) => {
@@ -160,6 +179,7 @@ export default function HomePage() {
 
   const randomizedListings = useMemo(() => {
     return shuffleArray(rawListings);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawListings.length]);
 
   const handleOpenStories = (index = 0) => {
@@ -167,6 +187,8 @@ export default function HomePage() {
     setSelectedStoryIndex(index);
     setIsStoryModalOpen(true);
   };
+
+  const hasSearchText = (filters.search || "").trim().length > 0;
 
   return (
     <div
@@ -188,20 +210,39 @@ export default function HomePage() {
                 type="text"
                 name="search"
                 placeholder="Search properties, areas..."
-                /* text-base prevents iOS Safari from zooming in on input tap */
-                className="w-full input text-base sm:text-sm pr-8"
+                /* text-base prevents iOS Safari zoom */
+                className="w-full input text-base sm:text-sm pr-20"
                 value={filters.search}
                 onChange={handleInputChange}
+                onKeyDown={(e) => e.key === "Escape" && handleClearSearch()}
               />
+
+              {/* Loading indicator */}
               {isFetching && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="absolute right-10 top-1/2 -translate-y-1/2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
                 </div>
+              )}
+
+              {/* Clear button */}
+              {hasSearchText && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-gray-300 hover:text-white transition"
+                  title="Clear search"
+                  aria-label="Clear search"
+                >
+                  ✕
+                </button>
               )}
             </div>
 
             <div className="flex gap-2">
-              <button type="submit" className="btn-primary flex-1 sm:flex-none text-sm py-2 px-4">
+              <button
+                type="submit"
+                className="btn-primary flex-1 sm:flex-none text-sm py-2 px-4"
+              >
                 Search
               </button>
               <button
@@ -214,7 +255,11 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className={`${mobileFiltersOpen ? "block" : "hidden sm:grid"} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 pt-2`}>
+          <div
+            className={`${
+              mobileFiltersOpen ? "block" : "hidden sm:grid"
+            } grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 pt-2`}
+          >
             <div>
               <label className="label text-[11px] sm:text-xs">Type</label>
               <select
@@ -224,7 +269,9 @@ export default function HomePage() {
                 className="input text-base sm:text-sm"
               >
                 {HOUSE_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>{type.label}</option>
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -274,7 +321,9 @@ export default function HomePage() {
                 className="input text-base sm:text-sm"
               >
                 {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -291,7 +340,11 @@ export default function HomePage() {
                   : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"
               }`}
             >
-              {isGettingLocation ? "Getting location..." : showNearby ? "Nearby mode ON" : "Show Nearby"}
+              {isGettingLocation
+                ? "Getting location..."
+                : showNearby
+                ? "Nearby mode ON"
+                : "Show Nearby"}
               {isFetching && <span className="animate-pulse text-blue-400">•</span>}
             </button>
 
@@ -308,21 +361,36 @@ export default function HomePage() {
         </form>
       </div>
 
-      {/* Stories Entry Feed Area */}
+      {/* Main Listing View */}
       {isLoading ? (
         <div className="flex justify-center items-center h-48 bg-black/80 backdrop-blur-md rounded-2xl border border-white/10">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
         </div>
       ) : isError ? (
         <div className="text-center py-8 bg-black/80 backdrop-blur-md rounded-2xl border border-white/10 space-y-3">
-          <p className="text-red-400 text-sm">Failed to load listings. Please try again.</p>
-          <button onClick={() => refetch()} className="btn-primary text-xs py-1.5 px-3">
+          <p className="text-red-400 text-sm">
+            Failed to load listings. Please try again.
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="btn-primary text-xs py-1.5 px-3"
+          >
             Retry Search
           </button>
         </div>
       ) : randomizedListings.length === 0 ? (
         <div className="text-center py-12 bg-black/90 backdrop-blur-md rounded-2xl border border-white/10">
-          <p className="text-gray-400 text-sm">No property listings found matching your search.</p>
+          <p className="text-gray-400 text-sm">
+            No property listings found matching your search.
+          </p>
+          {hasSearchText && (
+            <button
+              onClick={handleClearSearch}
+              className="btn-outline text-xs mt-4 py-1.5 px-4"
+            >
+              Clear Search
+            </button>
+          )}
         </div>
       ) : (
         <div className="bg-black/80 backdrop-blur-md rounded-2xl border border-white/10 p-4 sm:p-5 space-y-4 shadow-xl">
@@ -331,7 +399,8 @@ export default function HomePage() {
               Property Status Feed (Tap to view)
             </h3>
             <span className="text-[11px] text-gray-400">
-              {randomizedListings.length} {randomizedListings.length === 1 ? "Listing" : "Listings"}
+              {randomizedListings.length}{" "}
+              {randomizedListings.length === 1 ? "Listing" : "Listings"}
             </span>
           </div>
 
